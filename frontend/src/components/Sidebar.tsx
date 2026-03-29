@@ -41,42 +41,49 @@ export default function Sidebar() {
 		<nav
 			className={`flex flex-col ${sidebarOpen ? "w-64" : "w-14"} transition-all duration-200 bg-base-200 border-r border-base-300 overflow-hidden`}
 		>
-			{/* Toggle button */}
-			<div className="flex items-center px-3 py-2 shrink-0">
-				<button
-					type="button"
-					onClick={toggleSidebar}
-					className="btn btn-ghost btn-xs h-7 min-h-0 px-2"
-					title={sidebarOpen ? "Collapse sidebar (Ctrl+/)" : "Expand sidebar (Ctrl+/)"}
-				>
-					{sidebarOpen ? (
-						<LuPanelLeftClose size={16} />
-					) : (
-						<LuPanelLeftOpen size={16} />
-					)}
-				</button>
-			</div>
-
-			{/* App branding */}
-			<div className={`flex items-center gap-2.5 px-3 pb-2 shrink-0 ${sidebarOpen ? "" : "justify-center"}`}>
-				<img
-					src={splashIcon}
-					alt="Packi"
-					className="size-7 shrink-0"
-				/>
+			{/* App branding + toggle */}
+			<div className={`flex items-center gap-2.5 px-3 py-2 shrink-0 ${sidebarOpen ? "" : "justify-center"}`}>
+				{sidebarOpen ? (
+					<img
+						src={splashIcon}
+						alt="Packi"
+						className="size-7 shrink-0"
+					/>
+				) : (
+					<button
+						type="button"
+						onClick={toggleSidebar}
+						className="shrink-0 cursor-pointer"
+						title="Expand sidebar (Ctrl+/)"
+					>
+						<img src={splashIcon} alt="Packi" className="size-7" />
+					</button>
+				)}
 				{sidebarOpen && (
-					<div className="flex flex-col min-w-0">
-						<span className="text-sm font-bold tracking-tight leading-tight">Packi</span>
+					<>
+						<div className="flex flex-col min-w-0 flex-1">
+							<span className="text-sm font-bold tracking-tight leading-tight">Packi</span>
+							<button
+								type="button"
+								onClick={() => openUrl("https://github.com/parkerhdavis/Packi")}
+								className="text-xs text-base-content/40 hover:text-primary transition-colors leading-tight text-left cursor-pointer"
+							>
+								v0.1.0
+							</button>
+						</div>
 						<button
 							type="button"
-							onClick={() => openUrl("https://github.com/parkerhdavis/Packi")}
-							className="text-xs text-base-content/40 hover:text-primary transition-colors leading-tight text-left cursor-pointer"
+							onClick={toggleSidebar}
+							className="btn btn-ghost btn-xs h-7 min-h-0 px-2 shrink-0"
+							title="Collapse sidebar (Ctrl+/)"
 						>
-							v0.1.0
+							<LuPanelLeftClose size={16} />
 						</button>
-					</div>
+					</>
 				)}
 			</div>
+
+			<div className="border-b border-base-300 shrink-0" />
 
 			{/* Module navigation */}
 			<div className="flex flex-col gap-0.5 shrink-0">
