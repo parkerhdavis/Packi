@@ -2,16 +2,33 @@ use image::{DynamicImage, GenericImageView, RgbaImage};
 
 use crate::image_io::{encode_to_base64_png, load_dynamic_image, save_image};
 
+/// Optionally downscale an image to fit within `max_size` on its longest axis.
+fn maybe_resize(img: DynamicImage, max_size: Option<u32>) -> DynamicImage {
+	if let Some(max_size) = max_size {
+		let (w, h) = img.dimensions();
+		if w > max_size || h > max_size {
+			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+		} else {
+			img
+		}
+	} else {
+		img
+	}
+}
+
 /// Flip the green channel of a normal map (DX ↔ OpenGL conversion).
 #[tauri::command]
-pub async fn flip_normal_green(path: String) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || flip_normal_green_sync(&path))
+pub async fn flip_normal_green(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || flip_normal_green_sync(&path, max_preview_size))
 		.await
 		.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn flip_normal_green_sync(path: &str) -> Result<String, String> {
-	let img = load_dynamic_image(path)?;
+fn flip_normal_green_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
+	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
 	let mut rgba = img.to_rgba8();
 
 	for pixel in rgba.pixels_mut() {
@@ -23,14 +40,22 @@ fn flip_normal_green_sync(path: &str) -> Result<String, String> {
 
 /// Generate a normal map from a grayscale heightmap using Sobel filtering.
 #[tauri::command]
-pub async fn height_to_normal(path: String, strength: f32) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || height_to_normal_sync(&path, strength))
+pub async fn height_to_normal(
+	path: String,
+	strength: f32,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || height_to_normal_sync(&path, strength, max_preview_size))
 		.await
 		.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn height_to_normal_sync(path: &str, strength: f32) -> Result<String, String> {
-	let img = load_dynamic_image(path)?;
+fn height_to_normal_sync(
+	path: &str,
+	strength: f32,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
 	let gray = img.to_luma8();
 	let (w, h) = gray.dimensions();
 
@@ -38,7 +63,6 @@ fn height_to_normal_sync(path: &str, strength: f32) -> Result<String, String> {
 
 	for y in 0..h {
 		for x in 0..w {
-			// Sample heights with clamped border handling
 			let sample = |sx: i32, sy: i32| -> f32 {
 				let cx = sx.clamp(0, w as i32 - 1) as u32;
 				let cy = sy.clamp(0, h as i32 - 1) as u32;
@@ -48,25 +72,25 @@ fn height_to_normal_sync(path: &str, strength: f32) -> Result<String, String> {
 			let ix = x as i32;
 			let iy = y as i32;
 
-			// Sobel kernels for dX and dY
 			let dx = -sample(ix - 1, iy - 1) - 2.0 * sample(ix - 1, iy) - sample(ix - 1, iy + 1)
-				+ sample(ix + 1, iy - 1) + 2.0 * sample(ix + 1, iy) + sample(ix + 1, iy + 1);
+				+ sample(ix + 1, iy - 1)
+				+ 2.0 * sample(ix + 1, iy)
+				+ sample(ix + 1, iy + 1);
 
 			let dy = -sample(ix - 1, iy - 1) - 2.0 * sample(ix, iy - 1) - sample(ix + 1, iy - 1)
-				+ sample(ix - 1, iy + 1) + 2.0 * sample(ix, iy + 1) + sample(ix + 1, iy + 1);
+				+ sample(ix - 1, iy + 1)
+				+ 2.0 * sample(ix, iy + 1)
+				+ sample(ix + 1, iy + 1);
 
-			// Scale gradients by strength
 			let nx = -dx * strength;
 			let ny = -dy * strength;
 			let nz = 1.0f32;
 
-			// Normalize
 			let len = (nx * nx + ny * ny + nz * nz).sqrt();
 			let nx = nx / len;
 			let ny = ny / len;
 			let nz = nz / len;
 
-			// Map from [-1,1] to [0,255]
 			let r = ((nx * 0.5 + 0.5) * 255.0).round() as u8;
 			let g = ((ny * 0.5 + 0.5) * 255.0).round() as u8;
 			let b = ((nz * 0.5 + 0.5) * 255.0).round() as u8;
@@ -84,20 +108,27 @@ pub async fn blend_normals(
 	path_a: String,
 	path_b: String,
 	blend_factor: f32,
+	max_preview_size: Option<u32>,
 ) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || blend_normals_sync(&path_a, &path_b, blend_factor))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
+	tokio::task::spawn_blocking(move || {
+		blend_normals_sync(&path_a, &path_b, blend_factor, max_preview_size)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<String, String> {
-	let img_a = load_dynamic_image(path_a)?;
+fn blend_normals_sync(
+	path_a: &str,
+	path_b: &str,
+	blend_factor: f32,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	let img_a = maybe_resize(load_dynamic_image(path_a)?, max_preview_size);
 	let img_b = load_dynamic_image(path_b)?;
 
 	let rgba_a = img_a.to_rgba8();
 	let (w, h) = rgba_a.dimensions();
 
-	// Resize B to match A if needed
 	let img_b = if img_b.dimensions() != (w, h) {
 		img_b.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
 	} else {
@@ -112,7 +143,6 @@ fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<S
 			let pa = rgba_a.get_pixel(x, y);
 			let pb = rgba_b.get_pixel(x, y);
 
-			// Unpack from [0,255] to [-1,1]
 			let a = [
 				pa[0] as f32 / 255.0 * 2.0 - 1.0,
 				pa[1] as f32 / 255.0 * 2.0 - 1.0,
@@ -124,18 +154,15 @@ fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<S
 				pb[2] as f32 / 255.0 * 2.0 - 1.0,
 			];
 
-			// Lerp B toward flat normal (0,0,1) based on blend_factor
 			let b = [
 				b[0] * blend_factor,
 				b[1] * blend_factor,
 				b[2] * blend_factor + (1.0 - blend_factor),
 			];
 
-			// RNM blend: t = a * (1,1,1) + (0,0,1), u = b * (-1,-1,1)
 			let t = [a[0], a[1], a[2] + 1.0];
 			let u = [-b[0], -b[1], b[2]];
 
-			// r = t * dot(t, u) / t.z - u
 			let dot = t[0] * u[0] + t[1] * u[1] + t[2] * u[2];
 			let r = if t[2].abs() > 1e-6 {
 				[
@@ -147,7 +174,6 @@ fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<S
 				a
 			};
 
-			// Normalize
 			let len = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
 			let r = if len > 1e-6 {
 				[r[0] / len, r[1] / len, r[2] / len]
@@ -155,7 +181,6 @@ fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<S
 				[0.0, 0.0, 1.0]
 			};
 
-			// Pack back to [0,255]
 			let out_r = ((r[0] * 0.5 + 0.5) * 255.0).round() as u8;
 			let out_g = ((r[1] * 0.5 + 0.5) * 255.0).round() as u8;
 			let out_b = ((r[2] * 0.5 + 0.5) * 255.0).round() as u8;
@@ -169,25 +194,26 @@ fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<S
 
 /// Re-normalize a normal map to unit length.
 #[tauri::command]
-pub async fn normalize_map(path: String) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || normalize_map_sync(&path))
+pub async fn normalize_map(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || normalize_map_sync(&path, max_preview_size))
 		.await
 		.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn normalize_map_sync(path: &str) -> Result<String, String> {
-	let img = load_dynamic_image(path)?;
+fn normalize_map_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
+	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
 	let mut rgba = img.to_rgba8();
 
 	for pixel in rgba.pixels_mut() {
-		// Unpack
 		let mut n = [
 			pixel[0] as f32 / 255.0 * 2.0 - 1.0,
 			pixel[1] as f32 / 255.0 * 2.0 - 1.0,
 			pixel[2] as f32 / 255.0 * 2.0 - 1.0,
 		];
 
-		// Normalize
 		let len = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt();
 		if len > 1e-6 {
 			n[0] /= len;
@@ -195,7 +221,6 @@ fn normalize_map_sync(path: &str) -> Result<String, String> {
 			n[2] /= len;
 		}
 
-		// Repack
 		pixel[0] = ((n[0] * 0.5 + 0.5) * 255.0).round() as u8;
 		pixel[1] = ((n[1] * 0.5 + 0.5) * 255.0).round() as u8;
 		pixel[2] = ((n[2] * 0.5 + 0.5) * 255.0).round() as u8;
@@ -204,7 +229,7 @@ fn normalize_map_sync(path: &str) -> Result<String, String> {
 	encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
 }
 
-/// Export a normal map operation result to disk.
+/// Export a normal map operation result to disk (always full resolution).
 #[tauri::command]
 pub async fn export_normal_result(
 	operation: String,
@@ -217,17 +242,18 @@ pub async fn export_normal_result(
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
 		let result_base64 = match operation.as_str() {
-			"flip" => flip_normal_green_sync(&path)?,
-			"height-to-normal" => height_to_normal_sync(&path, strength.unwrap_or(1.0))?,
+			"flip" => flip_normal_green_sync(&path, None)?,
+			"height-to-normal" => {
+				height_to_normal_sync(&path, strength.unwrap_or(1.0), None)?
+			}
 			"blend" => {
 				let second = second_path.as_deref().ok_or("Second path required for blend")?;
-				blend_normals_sync(&path, second, blend_factor.unwrap_or(0.5))?
+				blend_normals_sync(&path, second, blend_factor.unwrap_or(0.5), None)?
 			}
-			"normalize" => normalize_map_sync(&path)?,
+			"normalize" => normalize_map_sync(&path, None)?,
 			_ => return Err(format!("Unknown operation: {}", operation)),
 		};
 
-		// Decode the base64 result and save
 		use base64::Engine;
 		let bytes = base64::engine::general_purpose::STANDARD
 			.decode(&result_base64)

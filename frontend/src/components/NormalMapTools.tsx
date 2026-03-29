@@ -27,6 +27,9 @@ export default function NormalMapTools() {
 		strength,
 		blendFactor,
 		processing,
+		inputLoading,
+		secondInputLoading,
+		previewLoading,
 		setOperation,
 		loadInput,
 		loadSecondInput,
@@ -49,9 +52,6 @@ export default function NormalMapTools() {
 			addToast(`Export failed: ${err}`, "error");
 		}
 	}, [exportResult, addToast]);
-
-	const inputFilename = inputPath?.split(/[\\/]/).pop() ?? null;
-	const secondFilename = secondInputPath?.split(/[\\/]/).pop() ?? null;
 
 	return (
 		<div className="flex flex-col h-full">
@@ -94,6 +94,7 @@ export default function NormalMapTools() {
 								thumbnail={inputPreview}
 								onFilePicked={loadInput}
 								onClear={clearInput}
+								loading={inputLoading}
 								compact
 							/>
 						</div>
@@ -110,6 +111,7 @@ export default function NormalMapTools() {
 									thumbnail={secondInputPreview}
 									onFilePicked={loadSecondInput}
 									onClear={clearSecondInput}
+									loading={secondInputLoading}
 									compact
 								/>
 							</div>
@@ -169,7 +171,7 @@ export default function NormalMapTools() {
 							{processing ? (
 								<span className="loading loading-spinner loading-xs" />
 							) : null}
-							{processing ? "Processing..." : "Process"}
+							{processing ? "Processing..." : "Process and Preview"}
 						</button>
 					</div>
 
@@ -201,7 +203,7 @@ export default function NormalMapTools() {
 						<div className="absolute top-2 left-2 z-10 text-xs text-base-content/40 bg-base-200/80 px-2 py-0.5 rounded">
 							After
 						</div>
-						{processing && (
+						{(processing || previewLoading) && (
 							<div className="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10">
 								<span className="loading loading-spinner loading-md text-primary" />
 							</div>

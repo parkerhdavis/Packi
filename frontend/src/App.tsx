@@ -5,6 +5,8 @@ import Sidebar from "@/components/Sidebar";
 import ChannelPacker from "@/components/ChannelPacker";
 import NormalMapTools from "@/components/NormalMapTools";
 import BatchProcessor from "@/components/BatchProcessor";
+import TilingTools from "@/components/TilingTools";
+import FileSizing from "@/components/FileSizing";
 import AppSettings from "@/components/AppSettings";
 import StatusBar from "@/components/ui/StatusBar";
 import ToastContainer from "@/components/ui/ToastContainer";
@@ -73,7 +75,9 @@ export default function App() {
 			const setModule = useAppStore.getState().setActiveModule;
 			if (e.key === "1") { e.preventDefault(); setModule("channel-packer"); }
 			else if (e.key === "2") { e.preventDefault(); setModule("normal-tools"); }
-			else if (e.key === "3") { e.preventDefault(); setModule("batch-processor"); }
+			else if (e.key === "3") { e.preventDefault(); setModule("tiling"); }
+			else if (e.key === "4") { e.preventDefault(); setModule("file-sizing"); }
+			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
 			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
 		};
 		window.addEventListener("keydown", handleKeys);
@@ -117,6 +121,10 @@ export default function App() {
 				return <ChannelPacker />;
 			case "normal-tools":
 				return <NormalMapTools />;
+			case "tiling":
+				return <TilingTools />;
+			case "file-sizing":
+				return <FileSizing />;
 			case "batch-processor":
 				return <BatchProcessor />;
 			case "settings":

@@ -40,9 +40,12 @@ export default function TexturePreview({
 				const container = containerRef.current;
 				const scaleX = container.clientWidth / img.width;
 				const scaleY = container.clientHeight / img.height;
-				const fitZoom = Math.min(scaleX, scaleY, 1) * 0.95;
+				const fitZoom = Math.min(scaleX, scaleY);
 				setZoom(fitZoom);
-				setPan({ x: 0, y: 0 });
+				setPan({
+					x: (container.clientWidth - img.width * fitZoom) / 2,
+					y: (container.clientHeight - img.height * fitZoom) / 2,
+				});
 			}
 		};
 		img.src = imageData.startsWith("data:") ? imageData : `data:image/png;base64,${imageData}`;
@@ -145,9 +148,12 @@ export default function TexturePreview({
 		const img = imageRef.current;
 		const scaleX = container.clientWidth / img.width;
 		const scaleY = container.clientHeight / img.height;
-		const fitZoom = Math.min(scaleX, scaleY, 1) * 0.95;
+		const fitZoom = Math.min(scaleX, scaleY);
 		setZoom(fitZoom);
-		setPan({ x: 0, y: 0 });
+		setPan({
+			x: (container.clientWidth - img.width * fitZoom) / 2,
+			y: (container.clientHeight - img.height * fitZoom) / 2,
+		});
 		setFitMode(true);
 	}, []);
 

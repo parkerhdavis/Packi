@@ -48,7 +48,8 @@
 								"$HOME/**"
 							]
 						},
-						"core:path:allow-resolve-directory"
+						"core:path:allow-resolve-directory",
+						"opener:allow-open-url"
 					]
 				}
 			]
@@ -61,6 +62,7 @@
 			"../resources/icons/32x32.png",
 			"../resources/icons/128x128.png",
 			"../resources/icons/128x128@2x.png",
+			"../resources/icons/512x512.png",
 			"../resources/icons/icon.icns",
 			"../resources/icons/icon.ico"
 		]

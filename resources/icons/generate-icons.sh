@@ -51,6 +51,10 @@ echo "  Generated 128x128.png"
 convert "$APP_ICON" -resize 256x256 PNG32:128x128@2x.png
 echo "  Generated 128x128@2x.png (256x256)"
 
+# 512x512 - Large icon (Alt+Tab, dock, HiDPI)
+convert "$APP_ICON" -resize 512x512 PNG32:512x512.png
+echo "  Generated 512x512.png"
+
 # .ico for Windows (multi-size)
 convert "$APP_ICON" \
     \( -clone 0 -resize 16x16 \) \
@@ -59,6 +63,7 @@ convert "$APP_ICON" \
     \( -clone 0 -resize 64x64 \) \
     \( -clone 0 -resize 128x128 \) \
     \( -clone 0 -resize 256x256 \) \
+    \( -clone 0 -resize 512x512 \) \
     -delete 0 icon.ico
 echo "  Generated icon.ico (multi-size)"
 

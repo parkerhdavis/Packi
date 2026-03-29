@@ -1,9 +1,12 @@
 import { useAppStore } from "@/stores/appStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import type { ModuleName } from "@/types";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
 	LuLayers,
 	LuCompass,
+	LuGrid3X3,
+	LuFileBox,
 	LuFolderCog,
 	LuSettings,
 	LuPanelLeftClose,
@@ -16,6 +19,8 @@ import DirectoryTree from "@/components/ui/DirectoryTree";
 const modules: { id: ModuleName; label: string; icon: React.ReactNode }[] = [
 	{ id: "channel-packer", label: "Channel Packer", icon: <LuLayers size={20} /> },
 	{ id: "normal-tools", label: "Normal Map", icon: <LuCompass size={20} /> },
+	{ id: "tiling", label: "Tiling", icon: <LuGrid3X3 size={20} /> },
+	{ id: "file-sizing", label: "File Sizing", icon: <LuFileBox size={20} /> },
 	{ id: "batch-processor", label: "Batch", icon: <LuFolderCog size={20} /> },
 ];
 
@@ -25,32 +30,68 @@ export default function Sidebar() {
 	const sidebarOpen = useAppStore((s) => s.sidebarOpen);
 	const toggleSidebar = useAppStore((s) => s.toggleSidebar);
 
+	const theme = useSettingsStore((s) => s.settings.theme);
 	const inputDir = useSettingsStore((s) => s.settings.input_dir);
 	const outputDir = useSettingsStore((s) => s.settings.output_dir);
 	const save = useSettingsStore((s) => s.save);
+
+	const splashIcon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
 
 	return (
 		<nav
 			className={`flex flex-col ${sidebarOpen ? "w-64" : "w-14"} transition-all duration-200 bg-base-200 border-r border-base-300 overflow-hidden`}
 		>
-			{/* Toggle button */}
-			<div className="flex items-center px-3 py-2 shrink-0">
-				<button
-					type="button"
-					onClick={toggleSidebar}
-					className="btn btn-ghost btn-xs h-7 min-h-0 px-2"
-					title={sidebarOpen ? "Collapse sidebar (Ctrl+/)" : "Expand sidebar (Ctrl+/)"}
-				>
-					{sidebarOpen ? (
-						<LuPanelLeftClose size={16} />
-					) : (
-						<LuPanelLeftOpen size={16} />
-					)}
-				</button>
+			{/* App branding + toggle */}
+			<div className={`flex items-center gap-2.5 px-3 py-2 shrink-0 ${sidebarOpen ? "" : "justify-center"}`}>
+				{sidebarOpen ? (
+					<img
+						src={splashIcon}
+						alt="Packi"
+						className="size-7 shrink-0"
+					/>
+				) : (
+					<button
+						type="button"
+						onClick={toggleSidebar}
+						className="shrink-0 cursor-pointer"
+						title="Expand sidebar (Ctrl+/)"
+					>
+						<img src={splashIcon} alt="Packi" className="size-7" />
+					</button>
+				)}
+				{sidebarOpen && (
+					<>
+						<div className="flex flex-col min-w-0 flex-1">
+							<span className="text-sm font-bold tracking-tight leading-tight">Packi</span>
+							<button
+								type="button"
+								onClick={() => openUrl("https://github.com/parkerhdavis/Packi")}
+								className="text-xs text-base-content/40 hover:text-primary transition-colors leading-tight text-left cursor-pointer"
+							>
+								v0.1.0
+							</button>
+						</div>
+						<button
+							type="button"
+							onClick={toggleSidebar}
+							className="btn btn-ghost btn-xs h-7 min-h-0 px-2 shrink-0"
+							title="Collapse sidebar (Ctrl+/)"
+						>
+							<LuPanelLeftClose size={16} />
+						</button>
+					</>
+				)}
 			</div>
+
+			<div className="border-b border-base-300 shrink-0" />
 
 			{/* Module navigation */}
 			<div className="flex flex-col gap-0.5 shrink-0">
+				{sidebarOpen && (
+					<div className="px-4 pt-2 pb-1 text-xs font-semibold text-base-content/50 uppercase tracking-wider">
+						Modules
+					</div>
+				)}
 				{modules.map((m) => (
 					<button
 						key={m.id}

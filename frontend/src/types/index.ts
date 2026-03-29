@@ -19,6 +19,8 @@ export interface DirEntry {
 export type ModuleName =
 	| "channel-packer"
 	| "normal-tools"
+	| "tiling"
+	| "file-sizing"
 	| "batch-processor"
 	| "settings";
 
