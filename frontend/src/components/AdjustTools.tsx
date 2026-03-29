@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useAdjustStore } from "@/stores/adjustStore";
 import type { AdjustOperation } from "@/stores/adjustStore";
+import { useAppStore } from "@/stores/appStore";
 import { useToastStore } from "@/stores/toastStore";
 import PageHeader from "@/components/ui/PageHeader";
 import TexturePreview from "@/components/ui/TexturePreview";
@@ -9,6 +10,7 @@ import DropZone from "@/components/ui/DropZone";
 import CurveEditor from "@/components/ui/CurveEditor";
 import type { CurvePoint } from "@/components/ui/CurveEditor";
 import LuminanceHistogram from "@/components/ui/LuminanceHistogram";
+import HistorySidebar from "@/components/HistorySidebar";
 import type { ExportConfig } from "@/types";
 import {
 	LuSpline,
@@ -18,6 +20,7 @@ import {
 	LuMountain,
 	LuLayers,
 	LuTarget,
+	LuRotateCcw,
 } from "react-icons/lu";
 
 const operationMeta: Record<AdjustOperation, { label: string; description: string; icon: React.ReactNode }> = {
@@ -73,9 +76,6 @@ const sections = [
 	},
 ];
 
-const generalOperations = new Set(["luminance-curve", "adjust-hue", "adjust-saturation"]);
-const normalOperations = new Set(["flip", "height-to-normal", "blend", "normalize"]);
-
 export default function AdjustTools() {
 	const {
 		activeOperation,
@@ -83,29 +83,18 @@ export default function AdjustTools() {
 		inputInfo,
 		inputPreview,
 		resultPreview,
-		secondInputPath,
-		secondInputPreview,
-		strength,
-		blendFactor,
-		hueOffset,
-		saturationOffset,
-		processing,
+		operationParams,
 		inputLoading,
-		secondInputLoading,
 		previewLoading,
 		setOperation,
 		loadInput,
-		loadSecondInput,
 		clearInput,
-		clearSecondInput,
-		setStrength,
-		setBlendFactor,
-		setHueOffset,
-		setSaturationOffset,
-		setCurveLut,
-		processOperation,
+		updateParams,
+		resetOperation,
+		isOperationEdited,
 		exportResult,
 	} = useAdjustStore();
+	const historySidebarOpen = useAppStore((s) => s.historySidebarOpen);
 	const addToast = useToastStore((s) => s.addToast);
 
 	const handleExport = useCallback(async (config: ExportConfig) => {
@@ -120,11 +109,12 @@ export default function AdjustTools() {
 	}, [exportResult, addToast]);
 
 	const handleCurveChange = useCallback((_points: CurvePoint[], lut: number[]) => {
-		setCurveLut(lut);
-	}, [setCurveLut]);
+		updateParams("luminance-curve", { curveLut: lut, curvePoints: _points });
+	}, [updateParams]);
 
 	const meta = operationMeta[activeOperation];
 	const hasResult = resultPreview !== null;
+	const curveParams = operationParams["luminance-curve"];
 
 	return (
 		<div className="flex flex-col h-full">
@@ -149,6 +139,7 @@ export default function AdjustTools() {
 							<div className="flex flex-col gap-0.5 px-1.5 pb-2">
 								{section.operations.map((opId) => {
 									const op = operationMeta[opId];
+									const edited = isOperationEdited(opId);
 									return (
 										<button
 											key={opId}
@@ -161,7 +152,10 @@ export default function AdjustTools() {
 											}`}
 										>
 											<span className="shrink-0 opacity-70">{op.icon}</span>
-											<span>{op.label}</span>
+											<span className="flex-1">{op.label}</span>
+											{edited && (
+												<span className="size-1.5 rounded-full bg-primary shrink-0" />
+											)}
 										</button>
 									);
 								})}
@@ -172,71 +166,89 @@ export default function AdjustTools() {
 
 				{/* Controls panel */}
 				<div className="w-72 shrink-0 flex flex-col border-r border-base-300 overflow-y-auto">
-					{/* Function header */}
-					<div className="px-3 pt-3 pb-2 border-b border-base-300">
-						<div className="text-sm font-semibold text-base-content">
-							{meta.label}
+					{/* Module-level input */}
+					<div className="p-3 border-b border-base-300">
+						<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+							Input Image
+						</label>
+						<DropZone
+							label="Drop image"
+							filePath={inputPath}
+							thumbnail={inputPreview}
+							onFilePicked={loadInput}
+							onClear={clearInput}
+							loading={inputLoading}
+							compact
+						/>
+					</div>
+
+					{/* Function header + reset */}
+					<div className="flex items-start gap-2 px-3 pt-3 pb-2 border-b border-base-300">
+						<div className="flex-1 min-w-0">
+							<div className="text-sm font-semibold text-base-content">
+								{meta.label}
+							</div>
+							<div className="text-xs text-base-content/40 mt-0.5 leading-snug">
+								{meta.description}
+							</div>
 						</div>
-						<div className="text-xs text-base-content/40 mt-0.5 leading-snug">
-							{meta.description}
-						</div>
+						{isOperationEdited(activeOperation) && (
+							<button
+								type="button"
+								onClick={() => resetOperation(activeOperation)}
+								className="btn btn-ghost btn-xs h-6 min-h-0 px-1.5 shrink-0 mt-0.5"
+								title="Reset to default"
+							>
+								<LuRotateCcw size={12} />
+							</button>
+						)}
 					</div>
 
 					<div className="p-3 space-y-3">
-						{/* Input dropzone — shared across all operations */}
-						<div>
-							<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-								{activeOperation === "height-to-normal" ? "Heightmap" : "Input Image"}
-							</label>
-							<DropZone
-								label={activeOperation === "height-to-normal" ? "Drop heightmap" : "Drop image"}
-								filePath={inputPath}
-								thumbnail={inputPreview}
-								onFilePicked={loadInput}
-								onClear={clearInput}
-								loading={inputLoading}
-								compact
-							/>
-						</div>
-
 						{/* Operation-specific controls */}
 						{activeOperation === "luminance-curve" && (
-							<div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
-									Curve
-								</label>
-								<CurveEditor
-									width={240}
-									height={240}
-									onChange={handleCurveChange}
-								/>
-								<div className="flex justify-between text-xs text-base-content/30 mt-1">
-									<span>Shadows</span>
-									<span>Highlights</span>
+							<>
+								<div>
+									<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
+										Curve
+									</label>
+									<CurveEditor
+										key={curveParams.curvePoints ? JSON.stringify(curveParams.curvePoints) : "default"}
+										points={curveParams.curvePoints ?? undefined}
+										width={240}
+										height={240}
+										onChange={handleCurveChange}
+									/>
+									<div className="flex justify-between text-xs text-base-content/30 mt-1">
+										<span>Shadows</span>
+										<span>Highlights</span>
+									</div>
 								</div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1.5 mt-3 block">
-									Histogram
-								</label>
-								<LuminanceHistogram
-									imageData={resultPreview ?? inputPreview}
-									width={240}
-									height={240}
-								/>
-							</div>
+								<div>
+									<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
+										Histogram
+									</label>
+									<LuminanceHistogram
+										imageData={resultPreview ?? inputPreview}
+										width={240}
+										height={240}
+									/>
+								</div>
+							</>
 						)}
 
 						{activeOperation === "adjust-hue" && (
 							<div>
 								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Hue Offset: {hueOffset > 0 ? "+" : ""}{hueOffset.toFixed(0)}°
+									Hue Offset: {operationParams["adjust-hue"].hueOffset > 0 ? "+" : ""}{operationParams["adjust-hue"].hueOffset.toFixed(0)}°
 								</label>
 								<input
 									type="range"
 									min="-180"
 									max="180"
 									step="1"
-									value={hueOffset}
-									onChange={(e) => setHueOffset(Number.parseFloat(e.target.value))}
+									value={operationParams["adjust-hue"].hueOffset}
+									onChange={(e) => updateParams("adjust-hue", { hueOffset: Number.parseFloat(e.target.value) })}
 									className="range range-primary range-xs w-full"
 								/>
 								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
@@ -250,15 +262,15 @@ export default function AdjustTools() {
 						{activeOperation === "adjust-saturation" && (
 							<div>
 								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Saturation: {saturationOffset > 0 ? "+" : ""}{saturationOffset.toFixed(2)}
+									Saturation: {operationParams["adjust-saturation"].saturationOffset > 0 ? "+" : ""}{operationParams["adjust-saturation"].saturationOffset.toFixed(2)}
 								</label>
 								<input
 									type="range"
 									min="-1"
 									max="1"
 									step="0.01"
-									value={saturationOffset}
-									onChange={(e) => setSaturationOffset(Number.parseFloat(e.target.value))}
+									value={operationParams["adjust-saturation"].saturationOffset}
+									onChange={(e) => updateParams("adjust-saturation", { saturationOffset: Number.parseFloat(e.target.value) })}
 									className="range range-primary range-xs w-full"
 								/>
 								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
@@ -269,37 +281,32 @@ export default function AdjustTools() {
 							</div>
 						)}
 
-						{/* Second input for blend */}
-						{activeOperation === "blend" && (
-							<div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Normal Map B
+						{activeOperation === "flip" && (
+							<div className="flex items-center justify-between">
+								<label className="text-xs font-semibold text-base-content/50">
+									Enable Flip Green
 								</label>
-								<DropZone
-									label="Drop second normal map"
-									filePath={secondInputPath}
-									thumbnail={secondInputPreview}
-									onFilePicked={loadSecondInput}
-									onClear={clearSecondInput}
-									loading={secondInputLoading}
-									compact
+								<input
+									type="checkbox"
+									className="toggle toggle-primary toggle-sm"
+									checked={operationParams.flip.enabled}
+									onChange={(e) => updateParams("flip", { enabled: e.target.checked })}
 								/>
 							</div>
 						)}
 
-						{/* Strength slider for height-to-normal */}
 						{activeOperation === "height-to-normal" && (
 							<div>
 								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Strength: {strength.toFixed(1)}
+									Strength: {operationParams["height-to-normal"].strength.toFixed(1)}
 								</label>
 								<input
 									type="range"
 									min="0.1"
 									max="10"
 									step="0.1"
-									value={strength}
-									onChange={(e) => setStrength(Number.parseFloat(e.target.value))}
+									value={operationParams["height-to-normal"].strength}
+									onChange={(e) => updateParams("height-to-normal", { strength: Number.parseFloat(e.target.value) })}
 									className="range range-primary range-xs w-full"
 								/>
 								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
@@ -309,41 +316,60 @@ export default function AdjustTools() {
 							</div>
 						)}
 
-						{/* Blend factor slider */}
 						{activeOperation === "blend" && (
-							<div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Blend Factor: {blendFactor.toFixed(2)}
-								</label>
-								<input
-									type="range"
-									min="0"
-									max="1"
-									step="0.01"
-									value={blendFactor}
-									onChange={(e) => setBlendFactor(Number.parseFloat(e.target.value))}
-									className="range range-primary range-xs w-full"
-								/>
-								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-									<span>A only</span>
-									<span>Full blend</span>
+							<>
+								<div>
+									<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+										Normal Map B
+									</label>
+									<DropZone
+										label="Drop second normal map"
+										filePath={operationParams.blend.secondInputPath}
+										thumbnail={operationParams.blend.secondInputPreview}
+										onFilePicked={async (path) => {
+											const preview = await import("@tauri-apps/api/core").then(
+												(m) => m.invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 }),
+											);
+											updateParams("blend", { secondInputPath: path, secondInputPreview: preview });
+										}}
+										onClear={() => updateParams("blend", { secondInputPath: null, secondInputPreview: null })}
+										loading={false}
+										compact
+									/>
 								</div>
-							</div>
+								<div>
+									<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+										Blend Factor: {operationParams.blend.blendFactor.toFixed(2)}
+									</label>
+									<input
+										type="range"
+										min="0"
+										max="1"
+										step="0.01"
+										value={operationParams.blend.blendFactor}
+										onChange={(e) => updateParams("blend", { blendFactor: Number.parseFloat(e.target.value) })}
+										className="range range-primary range-xs w-full"
+									/>
+									<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
+										<span>A only</span>
+										<span>Full blend</span>
+									</div>
+								</div>
+							</>
 						)}
 
-						{/* Process button — for normal ops that need explicit process, and general ops */}
-						{normalOperations.has(activeOperation) && (
-							<button
-								type="button"
-								onClick={processOperation}
-								disabled={!inputPath || processing || (activeOperation === "blend" && !secondInputPath)}
-								className="btn btn-primary btn-sm w-full"
-							>
-								{processing ? (
-									<span className="loading loading-spinner loading-xs" />
-								) : null}
-								{processing ? "Processing..." : "Process and Preview"}
-							</button>
+						{activeOperation === "normalize" && (
+							<div className="flex items-center justify-between">
+								<label className="text-xs font-semibold text-base-content/50">
+									Enable Normalize
+								</label>
+								<input
+									type="checkbox"
+									className="toggle toggle-primary toggle-sm"
+									checked={operationParams.normalize.enabled}
+									onChange={(e) => updateParams("normalize", { enabled: e.target.checked })}
+								/>
+							</div>
 						)}
 					</div>
 
@@ -375,17 +401,20 @@ export default function AdjustTools() {
 						<div className="absolute top-2 left-2 z-10 text-xs text-base-content/40 bg-base-200/80 px-2 py-0.5 rounded">
 							After
 						</div>
-						{(processing || previewLoading) && (
+						{previewLoading && (
 							<div className="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10">
 								<span className="loading loading-spinner loading-md text-primary" />
 							</div>
 						)}
 						<TexturePreview
-							imageData={resultPreview}
+							imageData={resultPreview ?? inputPreview}
 							className="h-full"
 						/>
 					</div>
 				</div>
+
+				{/* History sidebar (right) */}
+				{historySidebarOpen && <HistorySidebar />}
 			</div>
 		</div>
 	);

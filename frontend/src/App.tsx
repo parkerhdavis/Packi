@@ -68,7 +68,7 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleZoom);
 	}, [zoomIn, zoomOut, zoomReset]);
 
-	// Global module switching: Ctrl+1/2/3 and sidebar toggle: Ctrl+/
+	// Global module switching: Ctrl+1/2/3, sidebar toggle: Ctrl+/, history: Ctrl+\
 	useEffect(() => {
 		const handleKeys = (e: KeyboardEvent) => {
 			if (!(e.ctrlKey || e.metaKey)) return;
@@ -79,10 +79,35 @@ export default function App() {
 			else if (e.key === "4") { e.preventDefault(); setModule("file-sizing"); }
 			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
 			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
+			else if (e.key === "\\") { e.preventDefault(); useAppStore.getState().toggleHistorySidebar(); }
 		};
 		window.addEventListener("keydown", handleKeys);
 		return () => window.removeEventListener("keydown", handleKeys);
 	}, [toggleSidebar]);
+
+	// Global undo/redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z
+	useEffect(() => {
+		const handleUndoRedo = async (e: KeyboardEvent) => {
+			if (!(e.ctrlKey || e.metaKey)) return;
+			// Don't intercept when focused in text inputs (let browser handle native undo)
+			const tag = (e.target as HTMLElement)?.tagName;
+			if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+			const { useUndoStore } = await import("@/stores/undoStore");
+			if (e.key === "z" && !e.shiftKey) {
+				e.preventDefault();
+				useUndoStore.getState().undo();
+			} else if (e.key === "z" && e.shiftKey) {
+				e.preventDefault();
+				useUndoStore.getState().redo();
+			} else if (e.key === "y") {
+				e.preventDefault();
+				useUndoStore.getState().redo();
+			}
+		};
+		window.addEventListener("keydown", handleUndoRedo);
+		return () => window.removeEventListener("keydown", handleUndoRedo);
+	}, []);
 
 	// Splash: wait for settings to load, fade in icon+text, linger, then fade out
 	useEffect(() => {

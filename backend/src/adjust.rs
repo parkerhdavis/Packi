@@ -1,4 +1,4 @@
-use image::{DynamicImage, GenericImageView};
+use image::{DynamicImage, GenericImageView, RgbaImage};
 
 use crate::image_io::{encode_to_base64_png, load_dynamic_image, save_image};
 
@@ -16,9 +16,46 @@ fn maybe_resize(img: DynamicImage, max_size: Option<u32>) -> DynamicImage {
 	}
 }
 
-/// Apply a luminance curve LUT to an image.
-/// The `lut` is a 256-entry array mapping input [0-255] → output [0-255].
-/// Applied to R, G, B channels independently (luminance-style curve).
+// --- Pure in-memory image-processing functions ---
+
+/// Apply a luminance curve LUT to an RGBA image in-place.
+pub fn apply_luminance_curve_to_image(mut rgba: RgbaImage, lut: &[u8]) -> RgbaImage {
+	for pixel in rgba.pixels_mut() {
+		pixel[0] = lut[pixel[0] as usize];
+		pixel[1] = lut[pixel[1] as usize];
+		pixel[2] = lut[pixel[2] as usize];
+	}
+	rgba
+}
+
+/// Shift hue of an RGBA image by `offset` degrees.
+pub fn apply_hue_to_image(mut rgba: RgbaImage, offset: f32) -> RgbaImage {
+	for pixel in rgba.pixels_mut() {
+		let (h, s, l) = rgb_to_hsl(pixel[0], pixel[1], pixel[2]);
+		let new_h = (h + offset).rem_euclid(360.0);
+		let (r, g, b) = hsl_to_rgb(new_h, s, l);
+		pixel[0] = r;
+		pixel[1] = g;
+		pixel[2] = b;
+	}
+	rgba
+}
+
+/// Scale saturation of an RGBA image by `offset` in [-1, 1].
+pub fn apply_saturation_to_image(mut rgba: RgbaImage, offset: f32) -> RgbaImage {
+	for pixel in rgba.pixels_mut() {
+		let (h, s, l) = rgb_to_hsl(pixel[0], pixel[1], pixel[2]);
+		let new_s = (s + offset * s.max(1.0 - s)).clamp(0.0, 1.0);
+		let (r, g, b) = hsl_to_rgb(h, new_s, l);
+		pixel[0] = r;
+		pixel[1] = g;
+		pixel[2] = b;
+	}
+	rgba
+}
+
+// --- Tauri commands (thin wrappers) ---
+
 #[tauri::command]
 pub async fn apply_luminance_curve(
 	path: String,
@@ -28,97 +65,45 @@ pub async fn apply_luminance_curve(
 	if lut.len() != 256 {
 		return Err(format!("LUT must have exactly 256 entries, got {}", lut.len()));
 	}
-	tokio::task::spawn_blocking(move || apply_luminance_curve_sync(&path, &lut, max_preview_size))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		let rgba = apply_luminance_curve_to_image(img.to_rgba8(), &lut);
+		encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn apply_luminance_curve_sync(
-	path: &str,
-	lut: &[u8],
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
-	let mut rgba = img.to_rgba8();
-
-	for pixel in rgba.pixels_mut() {
-		pixel[0] = lut[pixel[0] as usize];
-		pixel[1] = lut[pixel[1] as usize];
-		pixel[2] = lut[pixel[2] as usize];
-		// Alpha unchanged
-	}
-
-	encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
-}
-
-/// Adjust the hue of an image.
-/// `offset` is in degrees, range [-180, 180].
 #[tauri::command]
 pub async fn adjust_hue(
 	path: String,
 	offset: f32,
 	max_preview_size: Option<u32>,
 ) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || adjust_hue_sync(&path, offset, max_preview_size))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		let rgba = apply_hue_to_image(img.to_rgba8(), offset);
+		encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn adjust_hue_sync(
-	path: &str,
-	offset: f32,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
-	let mut rgba = img.to_rgba8();
-
-	for pixel in rgba.pixels_mut() {
-		let (h, s, l) = rgb_to_hsl(pixel[0], pixel[1], pixel[2]);
-		let new_h = (h + offset).rem_euclid(360.0);
-		let (r, g, b) = hsl_to_rgb(new_h, s, l);
-		pixel[0] = r;
-		pixel[1] = g;
-		pixel[2] = b;
-	}
-
-	encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
-}
-
-/// Adjust the saturation of an image.
-/// `offset` is in range [-1, 1], where -1 = fully desaturated, 0 = no change, 1 = double saturation.
 #[tauri::command]
 pub async fn adjust_saturation(
 	path: String,
 	offset: f32,
 	max_preview_size: Option<u32>,
 ) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || adjust_saturation_sync(&path, offset, max_preview_size))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		let rgba = apply_saturation_to_image(img.to_rgba8(), offset);
+		encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
-fn adjust_saturation_sync(
-	path: &str,
-	offset: f32,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
-	let mut rgba = img.to_rgba8();
-
-	for pixel in rgba.pixels_mut() {
-		let (h, s, l) = rgb_to_hsl(pixel[0], pixel[1], pixel[2]);
-		// offset of -1 brings saturation to 0, offset of 1 doubles it (clamped)
-		let new_s = (s + offset * s.max(1.0 - s)).clamp(0.0, 1.0);
-		let (r, g, b) = hsl_to_rgb(h, new_s, l);
-		pixel[0] = r;
-		pixel[1] = g;
-		pixel[2] = b;
-	}
-
-	encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
-}
-
-/// Export an adjust operation result to disk (always full resolution).
 #[tauri::command]
 pub async fn export_adjust_result(
 	operation: String,
@@ -130,29 +115,20 @@ pub async fn export_adjust_result(
 	saturation_offset: Option<f32>,
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
-		let result_base64 = match operation.as_str() {
+		let img = load_dynamic_image(&path)?;
+		let rgba = img.to_rgba8();
+
+		let result = match operation.as_str() {
 			"luminance-curve" => {
 				let lut = lut.ok_or("LUT required for luminance-curve")?;
-				apply_luminance_curve_sync(&path, &lut, None)?
+				apply_luminance_curve_to_image(rgba, &lut)
 			}
-			"adjust-hue" => {
-				adjust_hue_sync(&path, hue_offset.unwrap_or(0.0), None)?
-			}
-			"adjust-saturation" => {
-				adjust_saturation_sync(&path, saturation_offset.unwrap_or(0.0), None)?
-			}
+			"adjust-hue" => apply_hue_to_image(rgba, hue_offset.unwrap_or(0.0)),
+			"adjust-saturation" => apply_saturation_to_image(rgba, saturation_offset.unwrap_or(0.0)),
 			_ => return Err(format!("Unknown adjust operation: {}", operation)),
 		};
 
-		use base64::Engine;
-		let bytes = base64::engine::general_purpose::STANDARD
-			.decode(&result_base64)
-			.map_err(|e| format!("Failed to decode result: {}", e))?;
-
-		let img = image::load_from_memory(&bytes)
-			.map_err(|e| format!("Failed to load result image: {}", e))?;
-
-		save_image(&img, &output_path, &format, 8)
+		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format, 8)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
@@ -160,8 +136,7 @@ pub async fn export_adjust_result(
 
 // --- HSL conversion utilities ---
 
-/// Convert RGB (0-255 each) to HSL (H: 0-360, S: 0-1, L: 0-1).
-fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f32, f32, f32) {
+pub fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f32, f32, f32) {
 	let r = r as f32 / 255.0;
 	let g = g as f32 / 255.0;
 	let b = b as f32 / 255.0;
@@ -196,8 +171,7 @@ fn rgb_to_hsl(r: u8, g: u8, b: u8) -> (f32, f32, f32) {
 	(h * 60.0, s, l)
 }
 
-/// Convert HSL (H: 0-360, S: 0-1, L: 0-1) to RGB (0-255 each).
-fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
+pub fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
 	if s.abs() < 1e-6 {
 		let v = (l * 255.0).round() as u8;
 		return (v, v, v);

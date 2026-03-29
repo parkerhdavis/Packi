@@ -1,12 +1,168 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { ImageInfo } from "@/types";
+import type { CurvePoint } from "@/components/ui/CurveEditor";
+import { useUndoStore } from "@/stores/undoStore";
+
+// --- Operation types ---
 
 type AdjustSection = "general" | "normals";
-
 type GeneralOperation = "luminance-curve" | "adjust-hue" | "adjust-saturation";
 type NormalOperation = "flip" | "height-to-normal" | "blend" | "normalize";
 type AdjustOperation = GeneralOperation | NormalOperation;
+
+// --- Per-operation parameter interfaces ---
+
+interface LuminanceCurveParams {
+	curveLut: number[] | null;
+	curvePoints: CurvePoint[] | null;
+}
+
+interface AdjustHueParams {
+	hueOffset: number;
+}
+
+interface AdjustSaturationParams {
+	saturationOffset: number;
+}
+
+interface FlipParams {
+	enabled: boolean;
+}
+
+interface HeightToNormalParams {
+	strength: number;
+}
+
+interface BlendParams {
+	secondInputPath: string | null;
+	secondInputPreview: string | null;
+	blendFactor: number;
+}
+
+interface NormalizeParams {
+	enabled: boolean;
+}
+
+interface AllOperationParams {
+	"luminance-curve": LuminanceCurveParams;
+	"adjust-hue": AdjustHueParams;
+	"adjust-saturation": AdjustSaturationParams;
+	flip: FlipParams;
+	"height-to-normal": HeightToNormalParams;
+	blend: BlendParams;
+	normalize: NormalizeParams;
+}
+
+// --- Defaults (source of truth for "edited" detection) ---
+
+const OPERATION_DEFAULTS: AllOperationParams = {
+	"luminance-curve": { curveLut: null, curvePoints: null },
+	"adjust-hue": { hueOffset: 0 },
+	"adjust-saturation": { saturationOffset: 0 },
+	flip: { enabled: false },
+	"height-to-normal": { strength: 1.0 },
+	blend: { secondInputPath: null, secondInputPreview: null, blendFactor: 0.5 },
+	normalize: { enabled: false },
+};
+
+function cloneDefaults(): AllOperationParams {
+	return JSON.parse(JSON.stringify(OPERATION_DEFAULTS));
+}
+
+/** Pipeline order — operations are applied in this sequence. */
+const PIPELINE_ORDER: AdjustOperation[] = [
+	"luminance-curve", "adjust-hue", "adjust-saturation",
+	"flip", "height-to-normal", "blend", "normalize",
+];
+
+// --- Pipeline step builders ---
+
+interface PipelineStep {
+	op: string;
+	[key: string]: unknown;
+}
+
+function buildPipelineSteps(params: AllOperationParams): PipelineStep[] {
+	const steps: PipelineStep[] = [];
+
+	for (const op of PIPELINE_ORDER) {
+		if (!isEdited(op, params)) continue;
+
+		switch (op) {
+			case "luminance-curve": {
+				const p = params["luminance-curve"];
+				if (p.curveLut) steps.push({ op: "luminance-curve", lut: p.curveLut });
+				break;
+			}
+			case "adjust-hue": {
+				const p = params["adjust-hue"];
+				steps.push({ op: "adjust-hue", offset: p.hueOffset });
+				break;
+			}
+			case "adjust-saturation": {
+				const p = params["adjust-saturation"];
+				steps.push({ op: "adjust-saturation", offset: p.saturationOffset });
+				break;
+			}
+			case "flip":
+				steps.push({ op: "flip" });
+				break;
+			case "height-to-normal": {
+				const p = params["height-to-normal"];
+				steps.push({ op: "height-to-normal", strength: p.strength });
+				break;
+			}
+			case "blend": {
+				const p = params.blend;
+				if (p.secondInputPath) {
+					steps.push({
+						op: "blend",
+						second_path: p.secondInputPath,
+						blend_factor: p.blendFactor,
+					});
+				}
+				break;
+			}
+			case "normalize":
+				steps.push({ op: "normalize" });
+				break;
+		}
+	}
+
+	return steps;
+}
+
+// --- Helpers ---
+
+const generalOperations: GeneralOperation[] = ["luminance-curve", "adjust-hue", "adjust-saturation"];
+
+function sectionForOperation(op: AdjustOperation): AdjustSection {
+	if ((generalOperations as string[]).includes(op)) return "general";
+	return "normals";
+}
+
+function isEdited(op: AdjustOperation, params: AllOperationParams): boolean {
+	const current = params[op] as unknown as Record<string, unknown>;
+	const defaults = OPERATION_DEFAULTS[op] as unknown as Record<string, unknown>;
+	for (const key of Object.keys(defaults)) {
+		if (current[key] !== defaults[key]) return true;
+	}
+	return false;
+}
+
+// Human-readable labels for undo descriptions
+const operationLabels: Record<AdjustOperation, string> = {
+	"luminance-curve": "Luminance Curve",
+	"adjust-hue": "Adjust Hue",
+	"adjust-saturation": "Adjust Saturation",
+	flip: "Flip Green",
+	"height-to-normal": "Height to Normal",
+	blend: "Blend",
+	normalize: "Normalize",
+};
+
+// --- Store ---
 
 interface AdjustState {
 	activeSection: AdjustSection;
@@ -15,48 +171,24 @@ interface AdjustState {
 	inputInfo: ImageInfo | null;
 	inputPreview: string | null;
 	resultPreview: string | null;
-	secondInputPath: string | null;
-	secondInputPreview: string | null;
-	strength: number;
-	blendFactor: number;
-	hueOffset: number;
-	saturationOffset: number;
-	curveLut: number[] | null;
+	operationParams: AllOperationParams;
 	processing: boolean;
 	inputLoading: boolean;
-	secondInputLoading: boolean;
 	previewLoading: boolean;
 
-	setSection: (section: AdjustSection) => void;
 	setOperation: (op: AdjustOperation) => void;
 	loadInput: (path: string) => Promise<void>;
-	loadSecondInput: (path: string) => Promise<void>;
 	clearInput: () => void;
-	clearSecondInput: () => void;
-	setStrength: (value: number) => void;
-	setBlendFactor: (value: number) => void;
-	setHueOffset: (value: number) => void;
-	setSaturationOffset: (value: number) => void;
-	setCurveLut: (lut: number[]) => void;
+	updateParams: <T extends AdjustOperation>(
+		op: T,
+		partial: Partial<AllOperationParams[T]>,
+		description?: string,
+	) => void;
+	resetOperation: (op: AdjustOperation) => void;
+	isOperationEdited: (op: AdjustOperation) => boolean;
+	getEditedSteps: () => PipelineStep[];
 	regeneratePreview: () => void;
-	processOperation: () => Promise<void>;
 	exportResult: (outputPath: string, format: string) => Promise<void>;
-}
-
-const generalOperations: GeneralOperation[] = ["luminance-curve", "adjust-hue", "adjust-saturation"];
-const normalOperations: NormalOperation[] = ["flip", "height-to-normal", "blend", "normalize"];
-
-function sectionForOperation(op: AdjustOperation): AdjustSection {
-	if ((generalOperations as string[]).includes(op)) return "general";
-	return "normals";
-}
-
-function isNormalOperation(op: AdjustOperation): op is NormalOperation {
-	return (normalOperations as string[]).includes(op);
-}
-
-function isGeneralOperation(op: AdjustOperation): op is GeneralOperation {
-	return (generalOperations as string[]).includes(op);
 }
 
 let previewDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -68,33 +200,23 @@ export const useAdjustStore = create<AdjustState>((set, get) => ({
 	inputInfo: null,
 	inputPreview: null,
 	resultPreview: null,
-	secondInputPath: null,
-	secondInputPreview: null,
-	strength: 1.0,
-	blendFactor: 0.5,
-	hueOffset: 0,
-	saturationOffset: 0,
-	curveLut: null,
+	operationParams: cloneDefaults(),
 	processing: false,
 	inputLoading: false,
-	secondInputLoading: false,
 	previewLoading: false,
-
-	setSection: (section) => {
-		const defaultOp: AdjustOperation = section === "general" ? "luminance-curve" : "flip";
-		set({ activeSection: section, activeOperation: defaultOp, resultPreview: null });
-	},
 
 	setOperation: (op) => {
 		set({
 			activeSection: sectionForOperation(op),
 			activeOperation: op,
-			resultPreview: null,
 		});
-		get().regeneratePreview();
 	},
 
 	loadInput: async (path) => {
+		const oldPath = get().inputPath;
+		const oldInfo = get().inputInfo;
+		const oldPreview = get().inputPreview;
+
 		set({ inputLoading: true });
 		try {
 			const [info, preview] = await Promise.all([
@@ -108,6 +230,20 @@ export const useAdjustStore = create<AdjustState>((set, get) => ({
 				resultPreview: null,
 				inputLoading: false,
 			});
+
+			useUndoStore.getState().push({
+				description: "Load image",
+				timestamp: Date.now(),
+				undo: () => {
+					set({ inputPath: oldPath, inputInfo: oldInfo, inputPreview: oldPreview, resultPreview: null });
+					get().regeneratePreview();
+				},
+				redo: () => {
+					set({ inputPath: path, inputInfo: info, inputPreview: preview, resultPreview: null });
+					get().regeneratePreview();
+				},
+			});
+
 			get().regeneratePreview();
 		} catch (err) {
 			console.error("Failed to load input:", err);
@@ -115,113 +251,130 @@ export const useAdjustStore = create<AdjustState>((set, get) => ({
 		}
 	},
 
-	loadSecondInput: async (path) => {
-		set({ secondInputLoading: true });
-		try {
-			const preview = await invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 });
-			set({ secondInputPath: path, secondInputPreview: preview, secondInputLoading: false });
-			get().regeneratePreview();
-		} catch (err) {
-			console.error("Failed to load second input:", err);
-			set({ secondInputLoading: false });
-		}
-	},
-
 	clearInput: () => {
+		const oldPath = get().inputPath;
+		const oldInfo = get().inputInfo;
+		const oldPreview = get().inputPreview;
+
 		set({
 			inputPath: null,
 			inputInfo: null,
 			inputPreview: null,
 			resultPreview: null,
 		});
+
+		if (oldPath) {
+			useUndoStore.getState().push({
+				description: "Clear image",
+				timestamp: Date.now(),
+				undo: () => {
+					set({ inputPath: oldPath, inputInfo: oldInfo, inputPreview: oldPreview });
+					get().regeneratePreview();
+				},
+				redo: () => {
+					set({ inputPath: null, inputInfo: null, inputPreview: null, resultPreview: null });
+				},
+			});
+		}
 	},
 
-	clearSecondInput: () => {
-		set({ secondInputPath: null, secondInputPreview: null });
+	updateParams: (op, partial, description) => {
+		const oldParams = { ...get().operationParams[op] };
+		const newParams = { ...get().operationParams[op], ...partial };
+
+		set({
+			operationParams: {
+				...get().operationParams,
+				[op]: newParams,
+			},
+		});
+
+		const desc = description ?? `Change ${operationLabels[op]}`;
+		useUndoStore.getState().push({
+			description: desc,
+			timestamp: Date.now(),
+			undo: () => {
+				set({
+					operationParams: {
+						...get().operationParams,
+						[op]: oldParams,
+					},
+				});
+				get().regeneratePreview();
+			},
+			redo: () => {
+				set({
+					operationParams: {
+						...get().operationParams,
+						[op]: newParams,
+					},
+				});
+				get().regeneratePreview();
+			},
+		});
+
 		get().regeneratePreview();
 	},
 
-	setStrength: (value) => {
-		set({ strength: value });
+	resetOperation: (op) => {
+		const oldParams = { ...get().operationParams[op] };
+		const defaultParams = { ...OPERATION_DEFAULTS[op] };
+
+		// Don't push undo if already at defaults
+		if (!isEdited(op, get().operationParams)) return;
+
+		set({
+			operationParams: {
+				...get().operationParams,
+				[op]: { ...defaultParams },
+			},
+		});
+
+		useUndoStore.getState().push({
+			description: `Reset ${operationLabels[op]}`,
+			timestamp: Date.now(),
+			undo: () => {
+				set({
+					operationParams: {
+						...get().operationParams,
+						[op]: oldParams,
+					},
+				});
+				get().regeneratePreview();
+			},
+			redo: () => {
+				set({
+					operationParams: {
+						...get().operationParams,
+						[op]: { ...defaultParams },
+					},
+				});
+				get().regeneratePreview();
+			},
+		});
+
 		get().regeneratePreview();
 	},
 
-	setBlendFactor: (value) => {
-		set({ blendFactor: value });
-		get().regeneratePreview();
+	isOperationEdited: (op) => {
+		return isEdited(op, get().operationParams);
 	},
 
-	setHueOffset: (value) => {
-		set({ hueOffset: value });
-		get().regeneratePreview();
-	},
-
-	setSaturationOffset: (value) => {
-		set({ saturationOffset: value });
-		get().regeneratePreview();
-	},
-
-	setCurveLut: (lut) => {
-		set({ curveLut: lut });
-		get().regeneratePreview();
+	getEditedSteps: () => {
+		return buildPipelineSteps(get().operationParams);
 	},
 
 	regeneratePreview: () => {
 		if (previewDebounce) clearTimeout(previewDebounce);
 		previewDebounce = setTimeout(async () => {
-			const {
-				activeOperation, inputPath, secondInputPath,
-				strength, blendFactor, hueOffset, saturationOffset, curveLut,
-			} = get();
+			const { inputPath, operationParams } = get();
 			if (!inputPath) {
 				set({ resultPreview: null, previewLoading: false });
 				return;
 			}
 
-			// General operations
-			if (isGeneralOperation(activeOperation)) {
-				// Luminance curve needs a LUT to preview
-				if (activeOperation === "luminance-curve" && !curveLut) {
-					set({ resultPreview: null, previewLoading: false });
-					return;
-				}
-
-				set({ previewLoading: true });
-				try {
-					let result: string;
-					switch (activeOperation) {
-						case "luminance-curve":
-							result = await invoke<string>("apply_luminance_curve", {
-								path: inputPath,
-								lut: curveLut,
-								maxPreviewSize: 1024,
-							});
-							break;
-						case "adjust-hue":
-							result = await invoke<string>("adjust_hue", {
-								path: inputPath,
-								offset: hueOffset,
-								maxPreviewSize: 1024,
-							});
-							break;
-						case "adjust-saturation":
-							result = await invoke<string>("adjust_saturation", {
-								path: inputPath,
-								offset: saturationOffset,
-								maxPreviewSize: 1024,
-							});
-							break;
-					}
-					set({ resultPreview: result, previewLoading: false });
-				} catch (err) {
-					console.error("Auto-preview failed:", err);
-					set({ previewLoading: false });
-				}
-				return;
-			}
-
-			// Normal operations
-			if (activeOperation === "blend" && !secondInputPath) {
+			const steps = buildPipelineSteps(operationParams);
+			if (steps.length === 0) {
 				set({ resultPreview: null, previewLoading: false });
 				return;
 			}
@@ -229,136 +382,38 @@ export const useAdjustStore = create<AdjustState>((set, get) => ({
 			set({ previewLoading: true });
 
 			try {
-				let result: string;
-				switch (activeOperation) {
-					case "flip":
-						result = await invoke<string>("flip_normal_green", {
-							path: inputPath,
-							maxPreviewSize: 1024,
-						});
-						break;
-					case "height-to-normal":
-						result = await invoke<string>("height_to_normal", {
-							path: inputPath,
-							strength,
-							maxPreviewSize: 1024,
-						});
-						break;
-					case "blend":
-						result = await invoke<string>("blend_normals", {
-							pathA: inputPath,
-							pathB: secondInputPath,
-							blendFactor,
-							maxPreviewSize: 1024,
-						});
-						break;
-					case "normalize":
-						result = await invoke<string>("normalize_map", {
-							path: inputPath,
-							maxPreviewSize: 1024,
-						});
-						break;
-				}
+				const result = await invoke<string>("apply_adjust_pipeline", {
+					path: inputPath,
+					steps,
+					maxPreviewSize: 1024,
+				});
 				set({ resultPreview: result, previewLoading: false });
 			} catch (err) {
-				console.error("Auto-preview failed:", err);
+				console.error("Pipeline preview failed:", err);
 				set({ previewLoading: false });
 			}
 		}, 300);
 	},
 
-	processOperation: async () => {
-		const {
-			activeOperation, inputPath, secondInputPath,
-			strength, blendFactor, hueOffset, saturationOffset, curveLut,
-		} = get();
-		if (!inputPath) return;
-
-		set({ processing: true });
-
-		try {
-			let result: string;
-
-			if (isGeneralOperation(activeOperation)) {
-				switch (activeOperation) {
-					case "luminance-curve":
-						if (!curveLut) throw new Error("Curve LUT required");
-						result = await invoke<string>("apply_luminance_curve", {
-							path: inputPath,
-							lut: curveLut,
-						});
-						break;
-					case "adjust-hue":
-						result = await invoke<string>("adjust_hue", {
-							path: inputPath,
-							offset: hueOffset,
-						});
-						break;
-					case "adjust-saturation":
-						result = await invoke<string>("adjust_saturation", {
-							path: inputPath,
-							offset: saturationOffset,
-						});
-						break;
-				}
-			} else {
-				switch (activeOperation) {
-					case "flip":
-						result = await invoke<string>("flip_normal_green", { path: inputPath });
-						break;
-					case "height-to-normal":
-						result = await invoke<string>("height_to_normal", { path: inputPath, strength });
-						break;
-					case "blend":
-						if (!secondInputPath) throw new Error("Second input required for blend");
-						result = await invoke<string>("blend_normals", {
-							pathA: inputPath,
-							pathB: secondInputPath,
-							blendFactor,
-						});
-						break;
-					case "normalize":
-						result = await invoke<string>("normalize_map", { path: inputPath });
-						break;
-				}
-			}
-
-			set({ resultPreview: result!, processing: false });
-		} catch (err) {
-			console.error("Processing failed:", err);
-			set({ processing: false });
-		}
-	},
-
 	exportResult: async (outputPath, format) => {
-		const {
-			activeOperation, inputPath, secondInputPath,
-			strength, blendFactor, hueOffset, saturationOffset, curveLut,
-		} = get();
+		const { inputPath, operationParams } = get();
 		if (!inputPath) return;
 
-		if (isGeneralOperation(activeOperation)) {
-			await invoke("export_adjust_result", {
-				operation: activeOperation,
-				path: inputPath,
-				outputPath,
-				format,
-				lut: activeOperation === "luminance-curve" ? curveLut : null,
-				hueOffset: activeOperation === "adjust-hue" ? hueOffset : null,
-				saturationOffset: activeOperation === "adjust-saturation" ? saturationOffset : null,
-			});
-		} else {
-			await invoke("export_normal_result", {
-				operation: activeOperation,
-				path: inputPath,
-				outputPath,
-				format,
-				strength: activeOperation === "height-to-normal" ? strength : null,
-				secondPath: activeOperation === "blend" ? secondInputPath : null,
-				blendFactor: activeOperation === "blend" ? blendFactor : null,
-			});
-		}
+		const steps = buildPipelineSteps(operationParams);
+		if (steps.length === 0) return;
+
+		await invoke("export_pipeline_result", {
+			path: inputPath,
+			steps,
+			outputPath,
+			format,
+		});
 	},
 }));
 
-export type { AdjustSection, AdjustOperation, GeneralOperation, NormalOperation };
+export { OPERATION_DEFAULTS, PIPELINE_ORDER };
+export type {
+	AdjustSection, AdjustOperation, GeneralOperation, NormalOperation,
+	AllOperationParams, LuminanceCurveParams, AdjustHueParams, AdjustSaturationParams,
+	FlipParams, HeightToNormalParams, BlendParams, NormalizeParams,
+};
