@@ -24,32 +24,48 @@ pub struct PackConfig {
 /// Pack channels from multiple source images into a single RGBA image.
 /// Returns a base64-encoded PNG preview, downsampled to `max_preview_size` if provided.
 #[tauri::command]
-pub fn pack_channels(config: PackConfig, max_preview_size: Option<u32>) -> Result<String, String> {
-	let packed = do_pack(&config)?;
-	let img = DynamicImage::ImageRgba8(packed);
-	let preview = if let Some(max_size) = max_preview_size {
-		let (w, h) = img.dimensions();
-		if w > max_size || h > max_size {
-			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+pub async fn pack_channels(
+	config: PackConfig,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || {
+		let packed = do_pack(&config)?;
+		let img = DynamicImage::ImageRgba8(packed);
+		let preview = if let Some(max_size) = max_preview_size {
+			let (w, h) = img.dimensions();
+			if w > max_size || h > max_size {
+				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+			} else {
+				img
+			}
 		} else {
 			img
-		}
-	} else {
-		img
-	};
-	encode_to_base64_png(&preview)
+		};
+		encode_to_base64_png(&preview)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
 /// Pack channels and export to disk.
 #[tauri::command]
-pub fn export_packed(
+pub async fn export_packed(
 	config: PackConfig,
 	output_path: String,
 	format: String,
 	bit_depth: u8,
 ) -> Result<(), String> {
-	let packed = do_pack(&config)?;
-	save_image(&DynamicImage::ImageRgba8(packed), &output_path, &format, bit_depth)
+	tokio::task::spawn_blocking(move || {
+		let packed = do_pack(&config)?;
+		save_image(
+			&DynamicImage::ImageRgba8(packed),
+			&output_path,
+			&format,
+			bit_depth,
+		)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
 fn do_pack(config: &PackConfig) -> Result<RgbaImage, String> {
@@ -149,7 +165,10 @@ fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 	let mut max_w = 0u32;
 	let mut max_h = 0u32;
 
-	for cfg in [&config.r, &config.g, &config.b, &config.a].into_iter().flatten() {
+	for cfg in [&config.r, &config.g, &config.b, &config.a]
+		.into_iter()
+		.flatten()
+	{
 		let img = load_dynamic_image(&cfg.path)?;
 		let (w, h) = img.dimensions();
 		max_w = max_w.max(w);

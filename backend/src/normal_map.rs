@@ -4,8 +4,14 @@ use crate::image_io::{encode_to_base64_png, load_dynamic_image, save_image};
 
 /// Flip the green channel of a normal map (DX ↔ OpenGL conversion).
 #[tauri::command]
-pub fn flip_normal_green(path: String) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn flip_normal_green(path: String) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || flip_normal_green_sync(&path))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn flip_normal_green_sync(path: &str) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 	let mut rgba = img.to_rgba8();
 
 	for pixel in rgba.pixels_mut() {
@@ -17,8 +23,14 @@ pub fn flip_normal_green(path: String) -> Result<String, String> {
 
 /// Generate a normal map from a grayscale heightmap using Sobel filtering.
 #[tauri::command]
-pub fn height_to_normal(path: String, strength: f32) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn height_to_normal(path: String, strength: f32) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || height_to_normal_sync(&path, strength))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn height_to_normal_sync(path: &str, strength: f32) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 	let gray = img.to_luma8();
 	let (w, h) = gray.dimensions();
 
@@ -68,9 +80,19 @@ pub fn height_to_normal(path: String, strength: f32) -> Result<String, String> {
 
 /// Blend two normal maps using Reoriented Normal Mapping (RNM).
 #[tauri::command]
-pub fn blend_normals(path_a: String, path_b: String, blend_factor: f32) -> Result<String, String> {
-	let img_a = load_dynamic_image(&path_a)?;
-	let img_b = load_dynamic_image(&path_b)?;
+pub async fn blend_normals(
+	path_a: String,
+	path_b: String,
+	blend_factor: f32,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || blend_normals_sync(&path_a, &path_b, blend_factor))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn blend_normals_sync(path_a: &str, path_b: &str, blend_factor: f32) -> Result<String, String> {
+	let img_a = load_dynamic_image(path_a)?;
+	let img_b = load_dynamic_image(path_b)?;
 
 	let rgba_a = img_a.to_rgba8();
 	let (w, h) = rgba_a.dimensions();
@@ -147,8 +169,14 @@ pub fn blend_normals(path_a: String, path_b: String, blend_factor: f32) -> Resul
 
 /// Re-normalize a normal map to unit length.
 #[tauri::command]
-pub fn normalize_map(path: String) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn normalize_map(path: String) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || normalize_map_sync(&path))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn normalize_map_sync(path: &str) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 	let mut rgba = img.to_rgba8();
 
 	for pixel in rgba.pixels_mut() {
@@ -178,7 +206,7 @@ pub fn normalize_map(path: String) -> Result<String, String> {
 
 /// Export a normal map operation result to disk.
 #[tauri::command]
-pub fn export_normal_result(
+pub async fn export_normal_result(
 	operation: String,
 	path: String,
 	output_path: String,
@@ -187,25 +215,29 @@ pub fn export_normal_result(
 	second_path: Option<String>,
 	blend_factor: Option<f32>,
 ) -> Result<(), String> {
-	let result_base64 = match operation.as_str() {
-		"flip" => flip_normal_green(path)?,
-		"height-to-normal" => height_to_normal(path, strength.unwrap_or(1.0))?,
-		"blend" => {
-			let second = second_path.ok_or("Second path required for blend")?;
-			blend_normals(path, second, blend_factor.unwrap_or(0.5))?
-		}
-		"normalize" => normalize_map(path)?,
-		_ => return Err(format!("Unknown operation: {}", operation)),
-	};
+	tokio::task::spawn_blocking(move || {
+		let result_base64 = match operation.as_str() {
+			"flip" => flip_normal_green_sync(&path)?,
+			"height-to-normal" => height_to_normal_sync(&path, strength.unwrap_or(1.0))?,
+			"blend" => {
+				let second = second_path.as_deref().ok_or("Second path required for blend")?;
+				blend_normals_sync(&path, second, blend_factor.unwrap_or(0.5))?
+			}
+			"normalize" => normalize_map_sync(&path)?,
+			_ => return Err(format!("Unknown operation: {}", operation)),
+		};
 
-	// Decode the base64 result and save
-	use base64::Engine;
-	let bytes = base64::engine::general_purpose::STANDARD
-		.decode(&result_base64)
-		.map_err(|e| format!("Failed to decode result: {}", e))?;
+		// Decode the base64 result and save
+		use base64::Engine;
+		let bytes = base64::engine::general_purpose::STANDARD
+			.decode(&result_base64)
+			.map_err(|e| format!("Failed to decode result: {}", e))?;
 
-	let img = image::load_from_memory(&bytes)
-		.map_err(|e| format!("Failed to load result image: {}", e))?;
+		let img = image::load_from_memory(&bytes)
+			.map_err(|e| format!("Failed to load result image: {}", e))?;
 
-	save_image(&img, &output_path, &format, 8)
+		save_image(&img, &output_path, &format, 8)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }

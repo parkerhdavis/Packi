@@ -13,10 +13,15 @@ pub struct ImageInfo {
 	pub file_size: u64,
 }
 
-/// Load image metadata without decoding the full pixel data.
 #[tauri::command]
-pub fn load_image_info(path: String) -> Result<ImageInfo, String> {
-	let file_path = Path::new(&path);
+pub async fn load_image_info(path: String) -> Result<ImageInfo, String> {
+	tokio::task::spawn_blocking(move || load_image_info_sync(&path))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn load_image_info_sync(path: &str) -> Result<ImageInfo, String> {
+	let file_path = Path::new(path);
 	let metadata = std::fs::metadata(file_path)
 		.map_err(|e| format!("Failed to read file metadata: {}", e))?;
 
@@ -48,10 +53,18 @@ pub fn load_image_info(path: String) -> Result<ImageInfo, String> {
 	})
 }
 
-/// Load an image and return it as a base64-encoded PNG, optionally resized for preview.
 #[tauri::command]
-pub fn load_image_as_base64(path: String, max_preview_size: Option<u32>) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn load_image_as_base64(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || load_image_as_base64_sync(&path, max_preview_size))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn load_image_as_base64_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 
 	let img = if let Some(max_size) = max_preview_size {
 		let (w, h) = img.dimensions();
@@ -67,10 +80,15 @@ pub fn load_image_as_base64(path: String, max_preview_size: Option<u32>) -> Resu
 	encode_to_base64_png(&img)
 }
 
-/// Load a specific channel from an image as a grayscale base64 PNG.
 #[tauri::command]
-pub fn load_image_channel(path: String, channel: u8) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn load_image_channel(path: String, channel: u8) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || load_image_channel_sync(&path, channel))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn load_image_channel_sync(path: &str, channel: u8) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 	let rgba = img.to_rgba8();
 	let (w, h) = rgba.dimensions();
 
@@ -120,7 +138,12 @@ pub fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 }
 
 /// Save a DynamicImage to the specified path and format.
-pub fn save_image(img: &DynamicImage, path: &str, format: &str, _bit_depth: u8) -> Result<(), String> {
+pub fn save_image(
+	img: &DynamicImage,
+	path: &str,
+	format: &str,
+	_bit_depth: u8,
+) -> Result<(), String> {
 	let output_path = Path::new(path);
 
 	match format {
