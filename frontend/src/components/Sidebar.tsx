@@ -86,7 +86,7 @@ export default function Sidebar() {
 			<div className="border-b border-base-300 shrink-0" />
 
 			{/* Module navigation */}
-			<div className="flex flex-col gap-0.5 shrink-0">
+			<div className="flex flex-col gap-0.5 shrink-0 pb-3">
 				{sidebarOpen && (
 					<div className="px-4 pt-2 pb-1 text-xs font-semibold text-base-content/50 uppercase tracking-wider">
 						Modules
@@ -135,7 +135,7 @@ export default function Sidebar() {
 			{/* Directory trees (expanded only) */}
 			{sidebarOpen && (
 				<>
-					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">
+					<div className="flex-1 min-h-0 max-h-[30%] border-t border-base-300 flex flex-col">
 						<DirectoryTree
 							label="Input"
 							description="Set a working input directory to browse and drag textures from here."
@@ -144,7 +144,7 @@ export default function Sidebar() {
 							onClearDirectory={() => save({ input_dir: null })}
 						/>
 					</div>
-					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">
+					<div className="flex-1 min-h-0 max-h-[30%] border-t border-base-300 flex flex-col">
 						<DirectoryTree
 							label="Output"
 							description="Set a working output directory. Used as the default export location."
