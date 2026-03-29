@@ -1,0 +1,113 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+/* ─── Custom Packi Themes ───────────────────────────────────────────── */
+
+@plugin "daisyui/theme" {
+	name: "dark";
+	default: true;
+	color-scheme: dark;
+	--color-base-100: oklch(0.220 0.008 260);
+	--color-base-200: oklch(0.170 0.008 260);
+	--color-base-300: oklch(0.280 0.008 260);
+	--color-base-content: oklch(0.870 0.005 90);
+	--color-primary: oklch(0.560 0.145 148);
+	--color-primary-content: oklch(0.980 0 0);
+	--color-secondary: oklch(0.500 0.030 260);
+	--color-secondary-content: oklch(0.950 0 0);
+	--color-accent: oklch(0.650 0.120 148);
+	--color-accent-content: oklch(0.950 0 0);
+	--color-neutral: oklch(0.160 0.010 260);
+	--color-neutral-content: oklch(0.850 0.005 90);
+	--color-info: oklch(0.650 0.110 240);
+	--color-info-content: oklch(0.950 0 0);
+	--color-success: oklch(0.670 0.140 155);
+	--color-success-content: oklch(0.950 0 0);
+	--color-warning: oklch(0.780 0.140 80);
+	--color-warning-content: oklch(0.220 0.040 65);
+	--color-error: oklch(0.600 0.170 25);
+	--color-error-content: oklch(0.950 0 0);
+	--radius-selector: 0.5rem;
+	--radius-field: 0.375rem;
+	--radius-box: 0.75rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 1;
+	--noise: 0;
+}
+
+@plugin "daisyui/theme" {
+	name: "light";
+	color-scheme: light;
+	--color-base-100: oklch(0.985 0.002 90);
+	--color-base-200: oklch(0.940 0.006 85);
+	--color-base-300: oklch(0.850 0.012 85);
+	--color-base-content: oklch(0.230 0.015 260);
+	--color-primary: oklch(0.480 0.145 148);
+	--color-primary-content: oklch(0.985 0 0);
+	--color-secondary: oklch(0.540 0.035 260);
+	--color-secondary-content: oklch(0.980 0 0);
+	--color-accent: oklch(0.420 0.120 148);
+	--color-accent-content: oklch(0.980 0 0);
+	--color-neutral: oklch(0.230 0.015 260);
+	--color-neutral-content: oklch(0.930 0.005 90);
+	--color-info: oklch(0.680 0.120 240);
+	--color-info-content: oklch(0.980 0 0);
+	--color-success: oklch(0.700 0.160 155);
+	--color-success-content: oklch(0.980 0 0);
+	--color-warning: oklch(0.820 0.160 80);
+	--color-warning-content: oklch(0.260 0.045 65);
+	--color-error: oklch(0.630 0.190 25);
+	--color-error-content: oklch(0.980 0 0);
+	--radius-selector: 0.5rem;
+	--radius-field: 0.375rem;
+	--radius-box: 0.75rem;
+	--size-selector: 0.25rem;
+	--size-field: 0.25rem;
+	--border: 1px;
+	--depth: 1;
+	--noise: 0;
+}
+
+/* ─── Splash screen icon animation ──────────────────────────────────── */
+
+@keyframes splash-icon-in {
+	0% { opacity: 0; transform: scale(0.7); }
+	100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-splash-icon {
+	animation: splash-icon-in 0.8s ease-out both;
+}
+
+/* ─── Splash screen text animation ──────────────────────────────────── */
+
+@keyframes fade-in-up {
+	0% { opacity: 0; transform: translateY(12px); }
+	100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+	animation: fade-in-up 0.6s ease-out 0.6s both;
+}
+
+/* ─── Scrollbar styling ─────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: oklch(0.75 0 0);
+	border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: oklch(0.55 0 0);
+}

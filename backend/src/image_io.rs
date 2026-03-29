@@ -1,0 +1,162 @@
+use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader};
+use serde::{Deserialize, Serialize};
+use std::io::Cursor;
+use std::path::Path;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageInfo {
+	pub width: u32,
+	pub height: u32,
+	pub channels: u32,
+	pub format: String,
+	pub bit_depth: u32,
+	pub file_size: u64,
+}
+
+/// Load image metadata without decoding the full pixel data.
+#[tauri::command]
+pub fn load_image_info(path: String) -> Result<ImageInfo, String> {
+	let file_path = Path::new(&path);
+	let metadata = std::fs::metadata(file_path)
+		.map_err(|e| format!("Failed to read file metadata: {}", e))?;
+
+	let reader = ImageReader::open(file_path)
+		.map_err(|e| format!("Failed to open image: {}", e))?
+		.with_guessed_format()
+		.map_err(|e| format!("Failed to detect format: {}", e))?;
+
+	let format = reader
+		.format()
+		.map(format_to_string)
+		.unwrap_or_else(|| "unknown".to_string());
+
+	let img = reader
+		.decode()
+		.map_err(|e| format!("Failed to decode image: {}", e))?;
+
+	let (width, height) = img.dimensions();
+	let channels = img.color().channel_count() as u32;
+	let bit_depth = (img.color().bytes_per_pixel() as u32 * 8) / channels;
+
+	Ok(ImageInfo {
+		width,
+		height,
+		channels,
+		format,
+		bit_depth,
+		file_size: metadata.len(),
+	})
+}
+
+/// Load an image and return it as a base64-encoded PNG, optionally resized for preview.
+#[tauri::command]
+pub fn load_image_as_base64(path: String, max_preview_size: Option<u32>) -> Result<String, String> {
+	let img = load_dynamic_image(&path)?;
+
+	let img = if let Some(max_size) = max_preview_size {
+		let (w, h) = img.dimensions();
+		if w > max_size || h > max_size {
+			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+		} else {
+			img
+		}
+	} else {
+		img
+	};
+
+	encode_to_base64_png(&img)
+}
+
+/// Load a specific channel from an image as a grayscale base64 PNG.
+#[tauri::command]
+pub fn load_image_channel(path: String, channel: u8) -> Result<String, String> {
+	let img = load_dynamic_image(&path)?;
+	let rgba = img.to_rgba8();
+	let (w, h) = rgba.dimensions();
+
+	let mut gray = image::GrayImage::new(w, h);
+	for (x, y, pixel) in rgba.enumerate_pixels() {
+		let val = match channel {
+			0 => pixel[0],
+			1 => pixel[1],
+			2 => pixel[2],
+			3 => pixel[3],
+			// Luminance: standard weights
+			_ => {
+				let r = pixel[0] as f32;
+				let g = pixel[1] as f32;
+				let b = pixel[2] as f32;
+				(0.2126 * r + 0.7152 * g + 0.0722 * b).round() as u8
+			}
+		};
+		gray.put_pixel(x, y, image::Luma([val]));
+	}
+
+	let dynamic = DynamicImage::ImageLuma8(gray);
+	encode_to_base64_png(&dynamic)
+}
+
+/// Load a DynamicImage from a file path.
+pub fn load_dynamic_image(path: &str) -> Result<DynamicImage, String> {
+	let reader = ImageReader::open(path)
+		.map_err(|e| format!("Failed to open image: {}", e))?
+		.with_guessed_format()
+		.map_err(|e| format!("Failed to detect format: {}", e))?;
+
+	reader
+		.decode()
+		.map_err(|e| format!("Failed to decode image: {}", e))
+}
+
+/// Encode a DynamicImage to a base64 PNG string.
+pub fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
+	use base64::Engine;
+
+	let mut buf = Vec::new();
+	img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png)
+		.map_err(|e| format!("Failed to encode PNG: {}", e))?;
+
+	Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
+}
+
+/// Save a DynamicImage to the specified path and format.
+pub fn save_image(img: &DynamicImage, path: &str, format: &str, _bit_depth: u8) -> Result<(), String> {
+	let output_path = Path::new(path);
+
+	match format {
+		"png8" => {
+			let rgba = img.to_rgba8();
+			rgba.save(output_path)
+				.map_err(|e| format!("Failed to save PNG: {}", e))?;
+		}
+		"png16" => {
+			let rgba16 = img.to_rgba16();
+			rgba16.save(output_path)
+				.map_err(|e| format!("Failed to save PNG 16-bit: {}", e))?;
+		}
+		"tga" => {
+			let rgba = DynamicImage::ImageRgba8(img.to_rgba8());
+			rgba.save_with_format(output_path, ImageFormat::Tga)
+				.map_err(|e| format!("Failed to save TGA: {}", e))?;
+		}
+		"jpeg" => {
+			let rgb = img.to_rgb8();
+			rgb.save(output_path)
+				.map_err(|e| format!("Failed to save JPEG: {}", e))?;
+		}
+		_ => return Err(format!("Unsupported export format: {}", format)),
+	}
+
+	Ok(())
+}
+
+fn format_to_string(format: ImageFormat) -> String {
+	match format {
+		ImageFormat::Png => "PNG".to_string(),
+		ImageFormat::Jpeg => "JPEG".to_string(),
+		ImageFormat::Tga => "TGA".to_string(),
+		ImageFormat::Tiff => "TIFF".to_string(),
+		ImageFormat::Bmp => "BMP".to_string(),
+		_ => format!("{:?}", format),
+	}
+}
