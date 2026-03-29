@@ -133,17 +133,17 @@ export default function App() {
 	})();
 
 	return (
-		<div className="flex h-screen">
-			<Sidebar />
-			<div className="flex-1 flex flex-col min-w-0">
+		<div className="flex flex-col h-screen">
+			<div className="flex flex-1 min-h-0">
+				<Sidebar />
 				<div
-					className="flex-1 min-h-0"
+					className="flex-1 min-w-0"
 					style={zoom !== 100 ? { zoom: `${zoom}%` } : undefined}
 				>
 					<ErrorBoundary>{page}</ErrorBoundary>
 				</div>
-				<StatusBar />
 			</div>
+			<StatusBar />
 			<ToastContainer />
 		</div>
 	);

@@ -16,12 +16,12 @@ import {
 } from "react-icons/lu";
 import DirectoryTree from "@/components/ui/DirectoryTree";
 
-const modules: { id: ModuleName; label: string; icon: React.ReactNode }[] = [
-	{ id: "channel-packer", label: "Channel Packer", icon: <LuLayers size={20} /> },
-	{ id: "normal-tools", label: "Normal Map", icon: <LuCompass size={20} /> },
-	{ id: "tiling", label: "Tiling", icon: <LuGrid3X3 size={20} /> },
-	{ id: "file-sizing", label: "File Sizing", icon: <LuFileBox size={20} /> },
-	{ id: "batch-processor", label: "Batch", icon: <LuFolderCog size={20} /> },
+const modules: { id: ModuleName; label: string; tooltip: string; icon: React.ReactNode }[] = [
+	{ id: "channel-packer", label: "Channel Packer", tooltip: "Pack grayscale maps into RGBA channels", icon: <LuLayers size={20} /> },
+	{ id: "normal-tools", label: "Normal Map", tooltip: "Flip, generate, blend, and normalize", icon: <LuCompass size={20} /> },
+	{ id: "tiling", label: "Mesh and Tile", tooltip: "Seamless tiling preview and mesh tools", icon: <LuGrid3X3 size={20} /> },
+	{ id: "file-sizing", label: "File Sizing", tooltip: "Crop, resize, and recompress textures", icon: <LuFileBox size={20} /> },
+	{ id: "batch-processor", label: "Batch", tooltip: "Bulk format conversion, resize, and rename", icon: <LuFolderCog size={20} /> },
 ];
 
 export default function Sidebar() {
@@ -86,7 +86,7 @@ export default function Sidebar() {
 			<div className="border-b border-base-300 shrink-0" />
 
 			{/* Module navigation */}
-			<div className="flex flex-col gap-0.5 shrink-0">
+			<div className="flex flex-col gap-0.5 pb-3" style={{ flex: "2 1 0%" }}>
 				{sidebarOpen && (
 					<div className="px-4 pt-2 pb-1 text-xs font-semibold text-base-content/50 uppercase tracking-wider">
 						Modules
@@ -97,6 +97,7 @@ export default function Sidebar() {
 						key={m.id}
 						type="button"
 						onClick={() => setActiveModule(m.id)}
+						title={m.tooltip}
 						className={`flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors ${
 							activeModule === m.id
 								? "text-primary bg-primary/10 border-l-2 border-primary"
@@ -133,7 +134,7 @@ export default function Sidebar() {
 
 			{/* Directory trees (expanded only) */}
 			{sidebarOpen && (
-				<>
+				<div className="flex flex-col min-h-0" style={{ flex: "3 1 0%" }}>
 					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">
 						<DirectoryTree
 							label="Input"
@@ -152,7 +153,7 @@ export default function Sidebar() {
 							onClearDirectory={() => save({ output_dir: null })}
 						/>
 					</div>
-				</>
+				</div>
 			)}
 
 			{/* Collapsed directory indicators */}
