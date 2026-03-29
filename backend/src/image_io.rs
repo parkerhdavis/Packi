@@ -150,6 +150,61 @@ pub fn save_image(img: &DynamicImage, path: &str, format: &str, _bit_depth: u8) 
 	Ok(())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirEntry {
+	pub name: String,
+	pub path: String,
+	pub is_dir: bool,
+}
+
+/// List immediate children of a directory, returning directories and supported image files.
+#[tauri::command]
+pub fn list_directory(path: String) -> Result<Vec<DirEntry>, String> {
+	let dir_path = Path::new(&path);
+	if !dir_path.is_dir() {
+		return Err(format!("Not a directory: {}", path));
+	}
+
+	let supported = ["png", "tga", "jpg", "jpeg", "tif", "tiff", "bmp", "exr"];
+	let mut entries = Vec::new();
+
+	for entry in
+		std::fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?
+	{
+		let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+		let entry_path = entry.path();
+		let name = entry.file_name().to_string_lossy().to_string();
+
+		if name.starts_with('.') {
+			continue;
+		}
+
+		if entry_path.is_dir() {
+			entries.push(DirEntry {
+				name,
+				path: entry_path.to_string_lossy().to_string(),
+				is_dir: true,
+			});
+		} else if let Some(ext) = entry_path.extension().and_then(|s| s.to_str()) {
+			if supported.iter().any(|e| e.eq_ignore_ascii_case(ext)) {
+				entries.push(DirEntry {
+					name,
+					path: entry_path.to_string_lossy().to_string(),
+					is_dir: false,
+				});
+			}
+		}
+	}
+
+	entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+		(true, false) => std::cmp::Ordering::Less,
+		(false, true) => std::cmp::Ordering::Greater,
+		_ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+	});
+
+	Ok(entries)
+}
+
 fn format_to_string(format: ImageFormat) -> String {
 	match format {
 		ImageFormat::Png => "PNG".to_string(),

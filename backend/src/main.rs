@@ -13,7 +13,7 @@ use batch::{
 	save_pipeline_preset,
 };
 use channel_pack::{export_packed, pack_channels};
-use image_io::{load_image_as_base64, load_image_channel, load_image_info};
+use image_io::{list_directory, load_image_as_base64, load_image_channel, load_image_info};
 use normal_map::{blend_normals, export_normal_result, flip_normal_green, height_to_normal, normalize_map};
 use presets::{delete_user_preset, get_builtin_presets, load_user_presets, save_user_preset};
 use settings::{load_settings, save_settings};
@@ -78,6 +78,7 @@ fn main() {
 			load_image_info,
 			load_image_as_base64,
 			load_image_channel,
+			list_directory,
 			pack_channels,
 			export_packed,
 			get_builtin_presets,

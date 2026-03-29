@@ -21,6 +21,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 		window_height: null,
 		last_export_dir: null,
 		last_module: null,
+		sidebar_open: null,
+		input_dir: null,
+		output_dir: null,
 	},
 	loaded: false,
 

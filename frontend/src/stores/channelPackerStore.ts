@@ -191,6 +191,7 @@ export const useChannelPackerStore = create<ChannelPackerState>((set, get) => ({
 						a: makeConfig(channels.a),
 						target_resolution: targetResolution,
 					},
+					maxPreviewSize: 1024,
 				});
 				set({ preview, previewLoading: false });
 			} catch (err) {

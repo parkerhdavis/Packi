@@ -22,11 +22,22 @@ pub struct PackConfig {
 }
 
 /// Pack channels from multiple source images into a single RGBA image.
-/// Returns a base64-encoded PNG preview.
+/// Returns a base64-encoded PNG preview, downsampled to `max_preview_size` if provided.
 #[tauri::command]
-pub fn pack_channels(config: PackConfig) -> Result<String, String> {
+pub fn pack_channels(config: PackConfig, max_preview_size: Option<u32>) -> Result<String, String> {
 	let packed = do_pack(&config)?;
-	encode_to_base64_png(&DynamicImage::ImageRgba8(packed))
+	let img = DynamicImage::ImageRgba8(packed);
+	let preview = if let Some(max_size) = max_preview_size {
+		let (w, h) = img.dimensions();
+		if w > max_size || h > max_size {
+			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+		} else {
+			img
+		}
+	} else {
+		img
+	};
+	encode_to_base64_png(&preview)
 }
 
 /// Pack channels and export to disk.
