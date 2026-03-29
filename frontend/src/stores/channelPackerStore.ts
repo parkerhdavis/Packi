@@ -10,11 +10,22 @@ interface ChannelSlot {
 	info: ImageInfo;
 }
 
+interface PresetLabels {
+	r: string;
+	g: string;
+	b: string;
+	a: string;
+	r_invert: boolean;
+	g_invert: boolean;
+	b_invert: boolean;
+	a_invert: boolean;
+}
+
 interface PackingPreset {
 	name: string;
 	description: string;
 	builtin: boolean;
-	labels: { r: string; g: string; b: string; a: string };
+	labels: PresetLabels;
 }
 
 interface ChannelPackerState {
@@ -28,7 +39,7 @@ interface ChannelPackerState {
 	preview: string | null;
 	previewLoading: boolean;
 	activePreset: string | null;
-	presetLabels: { r: string; g: string; b: string; a: string } | null;
+	presetLabels: PresetLabels | null;
 	presets: PackingPreset[];
 	targetResolution: [number, number] | null;
 
@@ -78,13 +89,17 @@ export const useChannelPackerStore = create<ChannelPackerState>((set, get) => ({
 				}),
 			]);
 
+			const { presetLabels } = get();
+			const invertKey = `${slot}_invert` as keyof PresetLabels;
+			const defaultInvert = presetLabels ? Boolean(presetLabels[invertKey]) : false;
+
 			set((s) => ({
 				channels: {
 					...s.channels,
 					[slot]: {
 						filePath,
 						sourceChannel: "luminance" as ChannelSource,
-						invert: false,
+						invert: defaultInvert,
 						thumbnail,
 						info,
 					},
@@ -139,10 +154,27 @@ export const useChannelPackerStore = create<ChannelPackerState>((set, get) => ({
 	applyPreset: (presetName) => {
 		const preset = get().presets.find((p) => p.name === presetName);
 		if (!preset) return;
+		const { channels } = get();
+		const invertMap = {
+			r: preset.labels.r_invert,
+			g: preset.labels.g_invert,
+			b: preset.labels.b_invert,
+			a: preset.labels.a_invert,
+		};
+		// Apply preset invert defaults to any already-loaded channels
+		const updatedChannels = { ...channels };
+		for (const slot of ["r", "g", "b", "a"] as const) {
+			const ch = updatedChannels[slot];
+			if (ch) {
+				updatedChannels[slot] = { ...ch, invert: invertMap[slot] };
+			}
+		}
 		set({
 			activePreset: presetName,
 			presetLabels: preset.labels,
+			channels: updatedChannels,
 		});
+		get().regeneratePreview();
 	},
 
 	clearPreset: () => {
