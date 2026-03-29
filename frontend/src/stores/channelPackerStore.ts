@@ -24,6 +24,7 @@ interface ChannelPackerState {
 		b: ChannelSlot | null;
 		a: ChannelSlot | null;
 	};
+	loadingChannels: { r: boolean; g: boolean; b: boolean; a: boolean };
 	preview: string | null;
 	previewLoading: boolean;
 	activePreset: string | null;
@@ -56,6 +57,7 @@ let previewDebounce: ReturnType<typeof setTimeout> | null = null;
 
 export const useChannelPackerStore = create<ChannelPackerState>((set, get) => ({
 	channels: { r: null, g: null, b: null, a: null },
+	loadingChannels: { r: false, g: false, b: false, a: false },
 	preview: null,
 	previewLoading: false,
 	activePreset: null,
@@ -64,6 +66,9 @@ export const useChannelPackerStore = create<ChannelPackerState>((set, get) => ({
 	targetResolution: null,
 
 	setChannel: async (slot, filePath) => {
+		set((s) => ({
+			loadingChannels: { ...s.loadingChannels, [slot]: true },
+		}));
 		try {
 			const [info, thumbnail] = await Promise.all([
 				invoke<ImageInfo>("load_image_info", { path: filePath }),
@@ -84,11 +89,15 @@ export const useChannelPackerStore = create<ChannelPackerState>((set, get) => ({
 						info,
 					},
 				},
+				loadingChannels: { ...s.loadingChannels, [slot]: false },
 			}));
 
 			get().regeneratePreview();
 		} catch (err) {
 			console.error(`Failed to load image for channel ${slot}:`, err);
+			set((s) => ({
+				loadingChannels: { ...s.loadingChannels, [slot]: false },
+			}));
 		}
 	},
 
