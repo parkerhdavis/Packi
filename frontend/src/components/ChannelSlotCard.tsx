@@ -32,6 +32,7 @@ interface ChannelSlotCardProps {
 
 export default function ChannelSlotCard({ slot, label }: ChannelSlotCardProps) {
 	const channel = useChannelPackerStore((s) => s.channels[slot]);
+	const loading = useChannelPackerStore((s) => s.loadingChannels[slot]);
 	const setChannel = useChannelPackerStore((s) => s.setChannel);
 	const clearChannel = useChannelPackerStore((s) => s.clearChannel);
 	const setSourceChannel = useChannelPackerStore((s) => s.setSourceChannel);
@@ -54,6 +55,7 @@ export default function ChannelSlotCard({ slot, label }: ChannelSlotCardProps) {
 				thumbnail={channel?.thumbnail ?? null}
 				onFilePicked={(path) => setChannel(slot, path)}
 				onClear={() => clearChannel(slot)}
+				loading={loading}
 				compact
 			/>
 

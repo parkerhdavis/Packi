@@ -10,6 +10,7 @@ interface DropZoneProps {
 	onClear: () => void;
 	accept?: string[];
 	compact?: boolean;
+	loading?: boolean;
 }
 
 export default function DropZone({
@@ -20,6 +21,7 @@ export default function DropZone({
 	onClear,
 	accept,
 	compact = false,
+	loading = false,
 }: DropZoneProps) {
 	const [dragOver, setDragOver] = useState(false);
 
@@ -50,6 +52,17 @@ export default function DropZone({
 	}, []);
 
 	const filename = filePath?.split(/[\\/]/).pop() ?? null;
+
+	if (loading) {
+		return (
+			<div className={`flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed border-primary/30 bg-primary/5 w-full ${compact ? "p-2" : "p-4"}`}>
+				<span className={`text-base-content/40 ${compact ? "text-xs" : "text-sm"}`}>
+					Importing…
+				</span>
+				<progress className="progress progress-primary w-full" />
+			</div>
+		);
+	}
 
 	if (filePath && thumbnail) {
 		return (
