@@ -87,6 +87,11 @@ export default function Sidebar() {
 
 			{/* Module navigation */}
 			<div className="flex flex-col gap-0.5 shrink-0">
+				{sidebarOpen && (
+					<div className="px-4 pt-2 pb-1 text-xs font-semibold text-base-content/50 uppercase tracking-wider">
+						Modules
+					</div>
+				)}
 				{modules.map((m) => (
 					<button
 						key={m.id}

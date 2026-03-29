@@ -104,7 +104,7 @@ export default function DirectoryTree({
 
 	return (
 		<div className="flex flex-col h-full min-h-0">
-			<div className="flex items-center gap-1 px-3 pt-2 pb-1 shrink-0">
+			<div className="flex items-center gap-1 px-3 pt-2 pb-2 shrink-0">
 				<div className="text-xs font-semibold text-base-content/50 uppercase tracking-wider flex-1 truncate">
 					{label}
 				</div>
