@@ -4,7 +4,7 @@ import { LuSun, LuMoon, LuPlus, LuMinus } from "react-icons/lu";
 
 const moduleLabels: Record<string, string> = {
 	"channel-packer": "Channel Packer",
-	"normal-tools": "Normal Map Tools",
+	adjust: "Adjust",
 	tiling: "Mesh and Tile",
 	"file-sizing": "File Sizing",
 	"batch-processor": "Batch Processor",

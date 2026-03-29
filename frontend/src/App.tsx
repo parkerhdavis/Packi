@@ -3,7 +3,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useAppStore } from "@/stores/appStore";
 import Sidebar from "@/components/Sidebar";
 import ChannelPacker from "@/components/ChannelPacker";
-import NormalMapTools from "@/components/NormalMapTools";
+import AdjustTools from "@/components/AdjustTools";
 import BatchProcessor from "@/components/BatchProcessor";
 import TilingTools from "@/components/TilingTools";
 import FileSizing from "@/components/FileSizing";
@@ -73,8 +73,8 @@ export default function App() {
 		const handleKeys = (e: KeyboardEvent) => {
 			if (!(e.ctrlKey || e.metaKey)) return;
 			const setModule = useAppStore.getState().setActiveModule;
-			if (e.key === "1") { e.preventDefault(); setModule("channel-packer"); }
-			else if (e.key === "2") { e.preventDefault(); setModule("normal-tools"); }
+			if (e.key === "1") { e.preventDefault(); setModule("adjust"); }
+			else if (e.key === "2") { e.preventDefault(); setModule("channel-packer"); }
 			else if (e.key === "3") { e.preventDefault(); setModule("tiling"); }
 			else if (e.key === "4") { e.preventDefault(); setModule("file-sizing"); }
 			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
@@ -119,8 +119,8 @@ export default function App() {
 		switch (activeModule) {
 			case "channel-packer":
 				return <ChannelPacker />;
-			case "normal-tools":
-				return <NormalMapTools />;
+			case "adjust":
+				return <AdjustTools />;
 			case "tiling":
 				return <TilingTools />;
 			case "file-sizing":

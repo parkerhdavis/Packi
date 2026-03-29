@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod adjust;
 mod batch;
 mod channel_pack;
 mod image_io;
@@ -8,6 +9,7 @@ mod normal_map;
 mod presets;
 mod settings;
 
+use adjust::{adjust_hue, adjust_saturation, apply_luminance_curve, export_adjust_result};
 use batch::{
 	delete_pipeline_preset, list_image_files, load_pipeline_presets, preview_batch, run_batch,
 	save_pipeline_preset,
@@ -86,6 +88,10 @@ fn main() {
 			load_user_presets,
 			save_user_preset,
 			delete_user_preset,
+			apply_luminance_curve,
+			adjust_hue,
+			adjust_saturation,
+			export_adjust_result,
 			flip_normal_green,
 			height_to_normal,
 			blend_normals,
