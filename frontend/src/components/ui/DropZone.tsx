@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { LuUpload, LuX } from "react-icons/lu";
 
 interface DropZoneProps {
@@ -24,10 +25,12 @@ export default function DropZone({
 	loading = false,
 }: DropZoneProps) {
 	const [dragOver, setDragOver] = useState(false);
+	const inputDir = useSettingsStore((s) => s.settings.input_dir);
 
 	const handleBrowse = useCallback(async () => {
 		const result = await open({
 			multiple: false,
+			defaultPath: inputDir ?? undefined,
 			filters: accept
 				? [{ name: "Images", extensions: accept }]
 				: [{ name: "Images", extensions: ["png", "tga", "jpg", "jpeg", "exr", "tif", "tiff"] }],
@@ -35,7 +38,7 @@ export default function DropZone({
 		if (result) {
 			onFilePicked(result as string);
 		}
-	}, [accept, onFilePicked]);
+	}, [accept, inputDir, onFilePicked]);
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
 		e.preventDefault();
@@ -49,7 +52,11 @@ export default function DropZone({
 	const handleDrop = useCallback((e: React.DragEvent) => {
 		e.preventDefault();
 		setDragOver(false);
-	}, []);
+		const packirPath = e.dataTransfer.getData("application/packi-filepath");
+		if (packirPath) {
+			onFilePicked(packirPath);
+		}
+	}, [onFilePicked]);
 
 	const filename = filePath?.split(/[\\/]/).pop() ?? null;
 
@@ -66,7 +73,12 @@ export default function DropZone({
 
 	if (filePath && thumbnail) {
 		return (
-			<div className={`flex items-center gap-2 rounded-lg bg-base-200 border border-base-300 ${compact ? "p-1.5" : "p-2"}`}>
+			<div
+				className={`flex items-center gap-2 rounded-lg bg-base-200 border border-base-300 ${compact ? "p-1.5" : "p-2"} ${dragOver ? "border-primary bg-primary/10" : ""}`}
+				onDragOver={handleDragOver}
+				onDragLeave={handleDragLeave}
+				onDrop={handleDrop}
+			>
 				<img
 					src={thumbnail.startsWith("data:") ? thumbnail : `data:image/png;base64,${thumbnail}`}
 					alt={filename ?? ""}

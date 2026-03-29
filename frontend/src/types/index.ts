@@ -5,6 +5,15 @@ export interface AppSettings {
 	window_height: number | null;
 	last_export_dir: string | null;
 	last_module: string | null;
+	sidebar_open: boolean | null;
+	input_dir: string | null;
+	output_dir: string | null;
+}
+
+export interface DirEntry {
+	name: string;
+	path: string;
+	is_dir: boolean;
 }
 
 export type ModuleName =

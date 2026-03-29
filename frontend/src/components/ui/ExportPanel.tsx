@@ -28,20 +28,21 @@ export default function ExportPanel({
 	filenameDefault = "output",
 }: ExportPanelProps) {
 	const lastExportDir = useSettingsStore((s) => s.settings.last_export_dir);
+	const outputDir = useSettingsStore((s) => s.settings.output_dir);
 	const saveSetting = useSettingsStore((s) => s.save);
 
 	const [format, setFormat] = useState<ExportFormat>(defaultFormat ?? formats[0]);
-	const [directory, setDirectory] = useState(lastExportDir ?? "");
+	const [directory, setDirectory] = useState(lastExportDir ?? outputDir ?? "");
 	const [filename, setFilename] = useState(filenameDefault);
 	const [exporting, setExporting] = useState(false);
 
 	const handlePickDir = useCallback(async () => {
-		const result = await open({ directory: true });
+		const result = await open({ directory: true, defaultPath: directory || outputDir || undefined });
 		if (result) {
 			setDirectory(result as string);
 			await saveSetting({ last_export_dir: result as string });
 		}
-	}, [saveSetting]);
+	}, [directory, outputDir, saveSetting]);
 
 	const handleExport = useCallback(async () => {
 		if (!directory || !filename) return;

@@ -14,6 +14,7 @@ export default function App() {
 	const { loaded, load, zoomIn, zoomOut, zoomReset } = useSettingsStore();
 	const zoom = useSettingsStore((s) => s.settings.zoom) ?? 100;
 	const activeModule = useAppStore((s) => s.activeModule);
+	const toggleSidebar = useAppStore((s) => s.toggleSidebar);
 	const [splashDone, setSplashDone] = useState(false);
 	const [fadeOut, setFadeOut] = useState(false);
 
@@ -27,14 +28,24 @@ export default function App() {
 		useSettingsStore.getState().save({ last_module: activeModule });
 	}, [activeModule, loaded]);
 
-	// Restore last module on load
+	// Restore last module and sidebar state on load
 	useEffect(() => {
 		if (!loaded) return;
-		const lastModule = useSettingsStore.getState().settings.last_module;
-		if (lastModule && lastModule !== "settings") {
-			useAppStore.getState().setActiveModule(lastModule as typeof activeModule);
+		const settings = useSettingsStore.getState().settings;
+		if (settings.last_module && settings.last_module !== "settings") {
+			useAppStore.getState().setActiveModule(settings.last_module as typeof activeModule);
+		}
+		if (settings.sidebar_open !== null) {
+			useAppStore.getState().setSidebarOpen(settings.sidebar_open);
 		}
 	}, [loaded]);
+
+	// Persist sidebar state changes to settings
+	const sidebarOpen = useAppStore((s) => s.sidebarOpen);
+	useEffect(() => {
+		if (!loaded) return;
+		useSettingsStore.getState().save({ sidebar_open: sidebarOpen });
+	}, [sidebarOpen, loaded]);
 
 	// Global zoom keyboard shortcuts: Ctrl+= / Ctrl+- / Ctrl+0
 	useEffect(() => {
@@ -55,18 +66,19 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleZoom);
 	}, [zoomIn, zoomOut, zoomReset]);
 
-	// Global module switching: Ctrl+1/2/3
+	// Global module switching: Ctrl+1/2/3 and sidebar toggle: Ctrl+/
 	useEffect(() => {
-		const handleModuleSwitch = (e: KeyboardEvent) => {
+		const handleKeys = (e: KeyboardEvent) => {
 			if (!(e.ctrlKey || e.metaKey)) return;
 			const setModule = useAppStore.getState().setActiveModule;
 			if (e.key === "1") { e.preventDefault(); setModule("channel-packer"); }
 			else if (e.key === "2") { e.preventDefault(); setModule("normal-tools"); }
 			else if (e.key === "3") { e.preventDefault(); setModule("batch-processor"); }
+			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
 		};
-		window.addEventListener("keydown", handleModuleSwitch);
-		return () => window.removeEventListener("keydown", handleModuleSwitch);
-	}, []);
+		window.addEventListener("keydown", handleKeys);
+		return () => window.removeEventListener("keydown", handleKeys);
+	}, [toggleSidebar]);
 
 	// Splash: wait for settings to load, fade in icon+text, linger, then fade out
 	useEffect(() => {

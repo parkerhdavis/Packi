@@ -13,10 +13,15 @@ pub struct ImageInfo {
 	pub file_size: u64,
 }
 
-/// Load image metadata without decoding the full pixel data.
 #[tauri::command]
-pub fn load_image_info(path: String) -> Result<ImageInfo, String> {
-	let file_path = Path::new(&path);
+pub async fn load_image_info(path: String) -> Result<ImageInfo, String> {
+	tokio::task::spawn_blocking(move || load_image_info_sync(&path))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn load_image_info_sync(path: &str) -> Result<ImageInfo, String> {
+	let file_path = Path::new(path);
 	let metadata = std::fs::metadata(file_path)
 		.map_err(|e| format!("Failed to read file metadata: {}", e))?;
 
@@ -48,10 +53,18 @@ pub fn load_image_info(path: String) -> Result<ImageInfo, String> {
 	})
 }
 
-/// Load an image and return it as a base64-encoded PNG, optionally resized for preview.
 #[tauri::command]
-pub fn load_image_as_base64(path: String, max_preview_size: Option<u32>) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn load_image_as_base64(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || load_image_as_base64_sync(&path, max_preview_size))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn load_image_as_base64_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 
 	let img = if let Some(max_size) = max_preview_size {
 		let (w, h) = img.dimensions();
@@ -67,10 +80,15 @@ pub fn load_image_as_base64(path: String, max_preview_size: Option<u32>) -> Resu
 	encode_to_base64_png(&img)
 }
 
-/// Load a specific channel from an image as a grayscale base64 PNG.
 #[tauri::command]
-pub fn load_image_channel(path: String, channel: u8) -> Result<String, String> {
-	let img = load_dynamic_image(&path)?;
+pub async fn load_image_channel(path: String, channel: u8) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || load_image_channel_sync(&path, channel))
+		.await
+		.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn load_image_channel_sync(path: &str, channel: u8) -> Result<String, String> {
+	let img = load_dynamic_image(path)?;
 	let rgba = img.to_rgba8();
 	let (w, h) = rgba.dimensions();
 
@@ -120,7 +138,12 @@ pub fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 }
 
 /// Save a DynamicImage to the specified path and format.
-pub fn save_image(img: &DynamicImage, path: &str, format: &str, _bit_depth: u8) -> Result<(), String> {
+pub fn save_image(
+	img: &DynamicImage,
+	path: &str,
+	format: &str,
+	_bit_depth: u8,
+) -> Result<(), String> {
 	let output_path = Path::new(path);
 
 	match format {
@@ -148,6 +171,61 @@ pub fn save_image(img: &DynamicImage, path: &str, format: &str, _bit_depth: u8) 
 	}
 
 	Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirEntry {
+	pub name: String,
+	pub path: String,
+	pub is_dir: bool,
+}
+
+/// List immediate children of a directory, returning directories and supported image files.
+#[tauri::command]
+pub fn list_directory(path: String) -> Result<Vec<DirEntry>, String> {
+	let dir_path = Path::new(&path);
+	if !dir_path.is_dir() {
+		return Err(format!("Not a directory: {}", path));
+	}
+
+	let supported = ["png", "tga", "jpg", "jpeg", "tif", "tiff", "bmp", "exr"];
+	let mut entries = Vec::new();
+
+	for entry in
+		std::fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?
+	{
+		let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+		let entry_path = entry.path();
+		let name = entry.file_name().to_string_lossy().to_string();
+
+		if name.starts_with('.') {
+			continue;
+		}
+
+		if entry_path.is_dir() {
+			entries.push(DirEntry {
+				name,
+				path: entry_path.to_string_lossy().to_string(),
+				is_dir: true,
+			});
+		} else if let Some(ext) = entry_path.extension().and_then(|s| s.to_str()) {
+			if supported.iter().any(|e| e.eq_ignore_ascii_case(ext)) {
+				entries.push(DirEntry {
+					name,
+					path: entry_path.to_string_lossy().to_string(),
+					is_dir: false,
+				});
+			}
+		}
+	}
+
+	entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+		(true, false) => std::cmp::Ordering::Less,
+		(false, true) => std::cmp::Ordering::Greater,
+		_ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+	});
+
+	Ok(entries)
 }
 
 fn format_to_string(format: ImageFormat) -> String {

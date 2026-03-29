@@ -23,6 +23,15 @@ pub struct AppSettings {
 	/// Last active module (for restoring on launch).
 	#[serde(default)]
 	pub last_module: Option<String>,
+	/// Whether the sidebar is expanded.
+	#[serde(default)]
+	pub sidebar_open: Option<bool>,
+	/// Working input directory.
+	#[serde(default)]
+	pub input_dir: Option<String>,
+	/// Working output directory.
+	#[serde(default)]
+	pub output_dir: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {
