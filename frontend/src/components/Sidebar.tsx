@@ -1,9 +1,12 @@
 import { useAppStore } from "@/stores/appStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import type { ModuleName } from "@/types";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
 	LuLayers,
 	LuCompass,
+	LuGrid3X3,
+	LuFileBox,
 	LuFolderCog,
 	LuSettings,
 	LuPanelLeftClose,
@@ -16,6 +19,8 @@ import DirectoryTree from "@/components/ui/DirectoryTree";
 const modules: { id: ModuleName; label: string; icon: React.ReactNode }[] = [
 	{ id: "channel-packer", label: "Channel Packer", icon: <LuLayers size={20} /> },
 	{ id: "normal-tools", label: "Normal Map", icon: <LuCompass size={20} /> },
+	{ id: "tiling", label: "Tiling", icon: <LuGrid3X3 size={20} /> },
+	{ id: "file-sizing", label: "File Sizing", icon: <LuFileBox size={20} /> },
 	{ id: "batch-processor", label: "Batch", icon: <LuFolderCog size={20} /> },
 ];
 
@@ -25,9 +30,12 @@ export default function Sidebar() {
 	const sidebarOpen = useAppStore((s) => s.sidebarOpen);
 	const toggleSidebar = useAppStore((s) => s.toggleSidebar);
 
+	const theme = useSettingsStore((s) => s.settings.theme);
 	const inputDir = useSettingsStore((s) => s.settings.input_dir);
 	const outputDir = useSettingsStore((s) => s.settings.output_dir);
 	const save = useSettingsStore((s) => s.save);
+
+	const splashIcon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
 
 	return (
 		<nav
@@ -47,6 +55,27 @@ export default function Sidebar() {
 						<LuPanelLeftOpen size={16} />
 					)}
 				</button>
+			</div>
+
+			{/* App branding */}
+			<div className={`flex items-center gap-2.5 px-3 pb-2 shrink-0 ${sidebarOpen ? "" : "justify-center"}`}>
+				<img
+					src={splashIcon}
+					alt="Packi"
+					className="size-7 shrink-0"
+				/>
+				{sidebarOpen && (
+					<div className="flex flex-col min-w-0">
+						<span className="text-sm font-bold tracking-tight leading-tight">Packi</span>
+						<button
+							type="button"
+							onClick={() => openUrl("https://github.com/parkerhdavis/Packi")}
+							className="text-xs text-base-content/40 hover:text-primary transition-colors leading-tight text-left cursor-pointer"
+						>
+							v0.1.0
+						</button>
+					</div>
+				)}
 			</div>
 
 			{/* Module navigation */}

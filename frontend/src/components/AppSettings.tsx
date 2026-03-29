@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useSettingsStore } from "@/stores/settingsStore";
 import PageHeader from "@/components/ui/PageHeader";
 import { LuFolderOpen } from "react-icons/lu";
@@ -92,10 +93,26 @@ export default function AppSettings() {
 					{/* About */}
 					<section>
 						<h2 className="text-sm font-semibold mb-3">About</h2>
-						<div className="text-sm text-base-content/60 space-y-1">
-							<p><strong>Packi</strong> v0.1.0</p>
-							<p>Texture packing and asset prep toolkit for game artists.</p>
-							<p>Offline, open-source, and free.</p>
+						<div className="flex items-start gap-3">
+							<img
+								src={settings.theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png"}
+								alt="Packi"
+								className="size-10 shrink-0"
+							/>
+							<div className="text-sm text-base-content/60 space-y-1">
+								<p><strong>Packi</strong> v0.1.0</p>
+								<p>Texture packing and asset prep toolkit for game artists.</p>
+								<p>
+									Developed by{" "}
+									<button
+										type="button"
+										onClick={() => openUrl("https://parkerhdavis.com")}
+										className="text-primary hover:underline cursor-pointer"
+									>
+										Parker H. Davis
+									</button>
+								</p>
+							</div>
 						</div>
 					</section>
 				</div>
