@@ -1,0 +1,86 @@
+import { create } from "zustand";
+import { invoke } from "@tauri-apps/api/core";
+import type { AppSettings } from "@/types";
+
+interface SettingsState {
+	settings: AppSettings;
+	loaded: boolean;
+	load: () => Promise<void>;
+	save: (settings: Partial<AppSettings>) => Promise<void>;
+	toggleTheme: () => Promise<void>;
+	zoomIn: () => Promise<void>;
+	zoomOut: () => Promise<void>;
+	zoomReset: () => Promise<void>;
+}
+
+export const useSettingsStore = create<SettingsState>((set, get) => ({
+	settings: {
+		theme: null,
+		zoom: null,
+		window_width: null,
+		window_height: null,
+		last_export_dir: null,
+		last_module: null,
+	},
+	loaded: false,
+
+	load: async () => {
+		try {
+			const settings = await invoke<AppSettings>("load_settings");
+			applyTheme(settings.theme);
+			applyZoom(settings.zoom);
+			set({ settings, loaded: true });
+		} catch (err) {
+			console.error("Failed to load settings:", err);
+			set({ loaded: true });
+		}
+	},
+
+	save: async (partial) => {
+		const current = get().settings;
+		const updated = { ...current, ...partial };
+		try {
+			await invoke("save_settings", { settings: updated });
+			set({ settings: updated });
+		} catch (err) {
+			console.error("Failed to save settings:", err);
+		}
+	},
+
+	toggleTheme: async () => {
+		const current = get().settings;
+		const next = current.theme === "light" ? "dark" : "light";
+		applyTheme(next);
+		await get().save({ theme: next });
+	},
+
+	zoomIn: async () => {
+		const current = get().settings.zoom ?? 100;
+		const next = Math.min(current + 5, 200);
+		applyZoom(next);
+		await get().save({ zoom: next });
+	},
+
+	zoomOut: async () => {
+		const current = get().settings.zoom ?? 100;
+		const next = Math.max(current - 5, 50);
+		applyZoom(next);
+		await get().save({ zoom: next });
+	},
+
+	zoomReset: async () => {
+		applyZoom(100);
+		await get().save({ zoom: 100 });
+	},
+}));
+
+function applyTheme(theme: string | null) {
+	document.documentElement.setAttribute(
+		"data-theme",
+		theme === "light" ? "light" : "dark",
+	);
+}
+
+function applyZoom(_zoom: number | null) {
+	document.documentElement.style.zoom = "";
+}

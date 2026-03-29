@@ -1,0 +1,130 @@
+import { useEffect, useState } from "react";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useAppStore } from "@/stores/appStore";
+import Sidebar from "@/components/Sidebar";
+import ChannelPacker from "@/components/ChannelPacker";
+import NormalMapTools from "@/components/NormalMapTools";
+import BatchProcessor from "@/components/BatchProcessor";
+import AppSettings from "@/components/AppSettings";
+import StatusBar from "@/components/ui/StatusBar";
+import ToastContainer from "@/components/ui/ToastContainer";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
+
+export default function App() {
+	const { loaded, load, zoomIn, zoomOut, zoomReset } = useSettingsStore();
+	const zoom = useSettingsStore((s) => s.settings.zoom) ?? 100;
+	const activeModule = useAppStore((s) => s.activeModule);
+	const [splashDone, setSplashDone] = useState(false);
+	const [fadeOut, setFadeOut] = useState(false);
+
+	useEffect(() => {
+		load();
+	}, [load]);
+
+	// Save active module to settings for restoring on next launch
+	useEffect(() => {
+		if (!loaded || activeModule === "settings") return;
+		useSettingsStore.getState().save({ last_module: activeModule });
+	}, [activeModule, loaded]);
+
+	// Restore last module on load
+	useEffect(() => {
+		if (!loaded) return;
+		const lastModule = useSettingsStore.getState().settings.last_module;
+		if (lastModule && lastModule !== "settings") {
+			useAppStore.getState().setActiveModule(lastModule as typeof activeModule);
+		}
+	}, [loaded]);
+
+	// Global zoom keyboard shortcuts: Ctrl+= / Ctrl+- / Ctrl+0
+	useEffect(() => {
+		const handleZoom = (e: KeyboardEvent) => {
+			if (!(e.ctrlKey || e.metaKey)) return;
+			if (e.key === "=" || e.key === "+") {
+				e.preventDefault();
+				zoomIn();
+			} else if (e.key === "-") {
+				e.preventDefault();
+				zoomOut();
+			} else if (e.key === "0") {
+				e.preventDefault();
+				zoomReset();
+			}
+		};
+		window.addEventListener("keydown", handleZoom);
+		return () => window.removeEventListener("keydown", handleZoom);
+	}, [zoomIn, zoomOut, zoomReset]);
+
+	// Global module switching: Ctrl+1/2/3
+	useEffect(() => {
+		const handleModuleSwitch = (e: KeyboardEvent) => {
+			if (!(e.ctrlKey || e.metaKey)) return;
+			const setModule = useAppStore.getState().setActiveModule;
+			if (e.key === "1") { e.preventDefault(); setModule("channel-packer"); }
+			else if (e.key === "2") { e.preventDefault(); setModule("normal-tools"); }
+			else if (e.key === "3") { e.preventDefault(); setModule("batch-processor"); }
+		};
+		window.addEventListener("keydown", handleModuleSwitch);
+		return () => window.removeEventListener("keydown", handleModuleSwitch);
+	}, []);
+
+	// Splash: wait for settings to load, fade in icon+text, linger, then fade out
+	useEffect(() => {
+		if (!loaded) return;
+		const fadeTimer = setTimeout(() => setFadeOut(true), 2600);
+		const doneTimer = setTimeout(() => setSplashDone(true), 3000);
+		return () => {
+			clearTimeout(fadeTimer);
+			clearTimeout(doneTimer);
+		};
+	}, [loaded]);
+
+	const theme = useSettingsStore((s) => s.settings.theme);
+	const splashIcon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
+
+	if (!splashDone) {
+		return (
+			<div
+				className={`flex flex-col items-center justify-center min-h-screen gap-6 transition-opacity duration-400 ${fadeOut ? "opacity-0" : "opacity-100"}`}
+			>
+				<img
+					src={splashIcon}
+					alt="Packi"
+					className="size-40 animate-splash-icon"
+				/>
+				<span className="text-4xl font-bold tracking-tight animate-fade-in-up">
+					Packi
+				</span>
+			</div>
+		);
+	}
+
+	const page = (() => {
+		switch (activeModule) {
+			case "channel-packer":
+				return <ChannelPacker />;
+			case "normal-tools":
+				return <NormalMapTools />;
+			case "batch-processor":
+				return <BatchProcessor />;
+			case "settings":
+				return <AppSettings />;
+		}
+	})();
+
+	return (
+		<div className="flex h-screen">
+			<Sidebar />
+			<div className="flex-1 flex flex-col min-w-0">
+				<div
+					className="flex-1 min-h-0"
+					style={zoom !== 100 ? { zoom: `${zoom}%` } : undefined}
+				>
+					<ErrorBoundary>{page}</ErrorBoundary>
+				</div>
+				<StatusBar />
+			</div>
+			<ToastContainer />
+		</div>
+	);
+}

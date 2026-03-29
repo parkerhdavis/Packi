@@ -1,0 +1,91 @@
+import { useChannelPackerStore } from "@/stores/channelPackerStore";
+import type { ChannelSource } from "@/types";
+import DropZone from "@/components/ui/DropZone";
+import { LuRefreshCw } from "react-icons/lu";
+
+const channelColors: Record<string, string> = {
+	r: "border-red-500",
+	g: "border-green-500",
+	b: "border-blue-500",
+	a: "border-base-content/30",
+};
+
+const channelNames: Record<string, string> = {
+	r: "R",
+	g: "G",
+	b: "B",
+	a: "A",
+};
+
+const sourceOptions: { value: ChannelSource; label: string }[] = [
+	{ value: "luminance", label: "Luminance" },
+	{ value: "r", label: "Red" },
+	{ value: "g", label: "Green" },
+	{ value: "b", label: "Blue" },
+	{ value: "a", label: "Alpha" },
+];
+
+interface ChannelSlotCardProps {
+	slot: "r" | "g" | "b" | "a";
+	label?: string;
+}
+
+export default function ChannelSlotCard({ slot, label }: ChannelSlotCardProps) {
+	const channel = useChannelPackerStore((s) => s.channels[slot]);
+	const setChannel = useChannelPackerStore((s) => s.setChannel);
+	const clearChannel = useChannelPackerStore((s) => s.clearChannel);
+	const setSourceChannel = useChannelPackerStore((s) => s.setSourceChannel);
+	const toggleInvert = useChannelPackerStore((s) => s.toggleInvert);
+
+	const displayLabel = label ?? channelNames[slot];
+
+	return (
+		<div className={`rounded-lg bg-base-100 border-l-4 ${channelColors[slot]} p-3`}>
+			<div className="flex items-center gap-2 mb-2">
+				<span className="text-sm font-bold">{channelNames[slot]}</span>
+				{label && (
+					<span className="text-xs text-base-content/50">{label}</span>
+				)}
+			</div>
+
+			<DropZone
+				label={`Drop ${displayLabel} texture`}
+				filePath={channel?.filePath ?? null}
+				thumbnail={channel?.thumbnail ?? null}
+				onFilePicked={(path) => setChannel(slot, path)}
+				onClear={() => clearChannel(slot)}
+				compact
+			/>
+
+			{channel && (
+				<div className="flex items-center gap-2 mt-2">
+					<select
+						value={channel.sourceChannel}
+						onChange={(e) => setSourceChannel(slot, e.target.value as ChannelSource)}
+						className="select select-xs select-bordered flex-1"
+					>
+						{sourceOptions.map((opt) => (
+							<option key={opt.value} value={opt.value}>
+								{opt.label}
+							</option>
+						))}
+					</select>
+
+					<label className="flex items-center gap-1 cursor-pointer">
+						<input
+							type="checkbox"
+							checked={channel.invert}
+							onChange={() => toggleInvert(slot)}
+							className="checkbox checkbox-xs checkbox-primary"
+						/>
+						<LuRefreshCw size={12} className="text-base-content/50" />
+					</label>
+
+					<span className="text-xs text-base-content/40">
+						{channel.info.width}x{channel.info.height}
+					</span>
+				</div>
+			)}
+		</div>
+	);
+}
