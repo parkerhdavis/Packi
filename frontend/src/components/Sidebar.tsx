@@ -132,10 +132,10 @@ export default function Sidebar() {
 				</button>
 			</div>
 
-			{/* Directory trees (expanded only) */}
+			{/* Directory trees (expanded only) — pinned to bottom */}
 			{sidebarOpen && (
-				<>
-					<div className="flex-1 min-h-0 max-h-[30%] border-t border-base-300 flex flex-col">
+				<div className="mt-auto flex flex-col shrink min-h-0 max-h-[45%]">
+					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">
 						<DirectoryTree
 							label="Input"
 							description="Set a working input directory to browse and drag textures from here."
@@ -144,7 +144,7 @@ export default function Sidebar() {
 							onClearDirectory={() => save({ input_dir: null })}
 						/>
 					</div>
-					<div className="flex-1 min-h-0 max-h-[30%] border-t border-base-300 flex flex-col">
+					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">
 						<DirectoryTree
 							label="Output"
 							description="Set a working output directory. Used as the default export location."
@@ -153,7 +153,7 @@ export default function Sidebar() {
 							onClearDirectory={() => save({ output_dir: null })}
 						/>
 					</div>
-				</>
+				</div>
 			)}
 
 			{/* Collapsed directory indicators */}
