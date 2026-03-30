@@ -1,6 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import DropZone from "@/components/ui/DropZone";
 import type { ImageInfo } from "@/types";
 
@@ -149,21 +148,23 @@ export default function MaterialPreviewPanel() {
 	const loadTexture = useCallback(async (slot: MapKey, path: string) => {
 		setLoadingSlot(slot);
 		try {
-			const [info, preview] = await Promise.all([
+			// Load thumbnail for the slot UI + full-res for the 3D preview
+			const [info, thumbnail, fullRes] = await Promise.all([
 				invoke<ImageInfo>("load_image_info", { path }),
 				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 128 }),
+				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 2048 }),
 			]);
 
 			setTextures((prev) => ({
 				...prev,
-				[slot]: { path, preview, info },
+				[slot]: { path, preview: thumbnail, info },
 			}));
 
-			// Convert local file path to a URL the iframe webview can load
-			const assetUrl = convertFileSrc(path);
+			// Pass as a data URL so the iframe can load it without cross-origin issues
+			const dataUrl = `data:image/png;base64,${fullRes}`;
 			const pbrKey = mapSlots.find((m) => m.key === slot)?.pbrKey;
 			if (pbrKey) {
-				sendConfig({ [pbrKey]: [assetUrl] });
+				sendConfig({ [pbrKey]: [dataUrl] });
 			}
 		} catch (err) {
 			console.error(`Failed to load texture for ${slot}:`, err);
