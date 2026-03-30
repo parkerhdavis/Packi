@@ -5,14 +5,14 @@ export default function AboutPanel() {
 	const theme = useSettingsStore((s) => s.settings.theme);
 
 	return (
-		<div className="p-6 max-w-lg">
-			<div className="flex items-start gap-3">
+		<div className="p-8 max-w-xl">
+			<div className="flex items-start gap-6">
 				<img
 					src={theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png"}
 					alt="Packi"
-					className="size-20 shrink-0"
+					className="size-30 shrink-0"
 				/>
-				<div className="text-sm text-base-content/60 space-y-1">
+				<div className="text-sm text-base-content/60 my-4 space-y-4">
 					<p><strong>Packi</strong> v{__APP_VERSION__}</p>
 					<p>Texture packing and asset prep toolkit for game artists.</p>
 					<p>
