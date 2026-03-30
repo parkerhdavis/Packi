@@ -124,6 +124,19 @@ fn load_image_as_base64_sync(path: &str, max_preview_size: Option<u32>) -> Resul
 }
 
 #[tauri::command]
+pub async fn load_image_as_png_bytes(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<Vec<u8>, String> {
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		encode_to_png_bytes(&img)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
 pub async fn load_image_channel(path: String, channel: u8) -> Result<String, String> {
 	tokio::task::spawn_blocking(move || load_image_channel_sync(&path, channel))
 		.await
@@ -173,13 +186,18 @@ pub fn load_dynamic_image(path: &str) -> Result<DynamicImage, String> {
 pub fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 	use base64::Engine;
 
+	let buf = encode_to_png_bytes(img)?;
+	Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
+}
+
+/// Encode a DynamicImage to raw PNG bytes using fast compression.
+pub fn encode_to_png_bytes(img: &DynamicImage) -> Result<Vec<u8>, String> {
 	let mut buf = Vec::new();
 	let cursor = Cursor::new(&mut buf);
 	let encoder = PngEncoder::new_with_quality(cursor, CompressionType::Fast, FilterType::Sub);
 	img.write_with_encoder(encoder)
 		.map_err(|e| format!("Failed to encode PNG: {}", e))?;
-
-	Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
+	Ok(buf)
 }
 
 /// Optionally downscale an image to fit within `max_size` on its longest axis.
