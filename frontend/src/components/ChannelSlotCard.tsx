@@ -1,4 +1,4 @@
-import { useChannelPackerStore } from "@/stores/channelPackerStore";
+import { usePackStore } from "@/stores/packStore";
 import type { ChannelSource } from "@/types";
 import DropZone from "@/components/ui/DropZone";
 import { LuRefreshCw } from "react-icons/lu";
@@ -31,12 +31,12 @@ interface ChannelSlotCardProps {
 }
 
 export default function ChannelSlotCard({ slot, label }: ChannelSlotCardProps) {
-	const channel = useChannelPackerStore((s) => s.channels[slot]);
-	const loading = useChannelPackerStore((s) => s.loadingChannels[slot]);
-	const setChannel = useChannelPackerStore((s) => s.setChannel);
-	const clearChannel = useChannelPackerStore((s) => s.clearChannel);
-	const setSourceChannel = useChannelPackerStore((s) => s.setSourceChannel);
-	const toggleInvert = useChannelPackerStore((s) => s.toggleInvert);
+	const channel = usePackStore((s) => s.packChannels[slot]);
+	const loading = usePackStore((s) => s.packLoadingChannels[slot]);
+	const setChannel = usePackStore((s) => s.setChannel);
+	const clearChannel = usePackStore((s) => s.clearChannel);
+	const setSourceChannel = usePackStore((s) => s.setSourceChannel);
+	const toggleInvert = usePackStore((s) => s.toggleInvert);
 
 	const displayLabel = label ?? channelNames[slot];
 

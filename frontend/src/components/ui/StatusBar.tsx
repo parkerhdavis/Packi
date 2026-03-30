@@ -3,7 +3,7 @@ import { useAppStore } from "@/stores/appStore";
 import { LuSun, LuMoon, LuPlus, LuMinus } from "react-icons/lu";
 
 const moduleLabels: Record<string, string> = {
-	"channel-packer": "Channel Packer",
+	pack: "Pack",
 	adjust: "Adjust",
 	tiling: "Mesh and Tile",
 	"file-sizing": "File Sizing",
