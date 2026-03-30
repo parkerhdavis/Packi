@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePreviewStore } from "@/stores/previewStore";
@@ -6,26 +6,15 @@ import DropZone from "@/components/ui/DropZone";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { LuWand } from "react-icons/lu";
 import type { ImageInfo, ImageWithPreview } from "@/types";
-
-type GeometryType = "plane" | "cube" | "sphere" | "cylinder" | "torus";
-type NormalType = "opengl" | "directx";
-
-const geometryOptions: { value: GeometryType; label: string }[] = [
-	{ value: "plane", label: "Plane" },
-	{ value: "cube", label: "Cube" },
-	{ value: "sphere", label: "Sphere" },
-	{ value: "cylinder", label: "Cylinder" },
-	{ value: "torus", label: "Torus" },
-];
-
-const environmentOptions = [
-	{ value: "studio", label: "Studio" },
-	{ value: "dune", label: "Dune" },
-	{ value: "forest", label: "Forest" },
-	{ value: "field", label: "Field" },
-	{ value: "lab", label: "Computer Lab" },
-	{ value: "night", label: "Night" },
-];
+import type { GeometryType, MapKey, NormalType } from "@/types/pbr";
+import { MAP_KEYS } from "@/types/pbr";
+import { useThreeScene } from "@/hooks/useThreeScene";
+import {
+	GEOMETRY_OPTIONS,
+	ENVIRONMENT_OPTIONS,
+	MAP_SLOTS,
+	detectNormalType,
+} from "@/components/preview/pbr/constants";
 
 interface TextureSlot {
 	path: string | null;
@@ -35,47 +24,28 @@ interface TextureSlot {
 
 const emptySlot: TextureSlot = { path: null, preview: null, info: null };
 
-const mapSlots = [
-	{ key: "color", label: "Color (Albedo)", pbrKey: "color_url", keywords: ["color", "albedo", "basecolor", "base_color", "diffuse"] },
-	{ key: "normal", label: "Normal Map", pbrKey: "normal_url", keywords: ["normal", "norm", "nrm"] },
-	{ key: "roughness", label: "Roughness", pbrKey: "roughness_url", keywords: ["roughness", "rough"] },
-	{ key: "metalness", label: "Metalness", pbrKey: "metalness_url", keywords: ["metalness", "metallic", "metal"] },
-	{ key: "ambientocclusion", label: "Ambient Occlusion", pbrKey: "ambientocclusion_url", keywords: ["ambientocclusion", "ao", "occlusion"] },
-	{ key: "displacement", label: "Displacement", pbrKey: "displacement_url", keywords: ["displacement", "disp", "height"] },
-	{ key: "opacity", label: "Opacity", pbrKey: "opacity_url", keywords: ["opacity", "alpha", "transparency"] },
-] as const;
-
-type MapKey = typeof mapSlots[number]["key"];
-
-/** Check if a filename indicates a specific normal type */
-function detectNormalType(filename: string): NormalType | null {
-	const lower = filename.toLowerCase();
-	if (lower.includes("directx") || lower.includes("_dx") || lower.includes("-dx") || lower.includes(".dx")) return "directx";
-	if (lower.includes("opengl") || lower.includes("_gl") || lower.includes("-gl") || lower.includes(".gl")) return "opengl";
-	return null;
-}
+const EMPTY_TEXTURES: Record<MapKey, string | null> = Object.fromEntries(
+	MAP_KEYS.map((k) => [k, null]),
+) as Record<MapKey, string | null>;
 
 export default function MaterialPreviewPanel() {
-	const iframeRef = useRef<HTMLIFrameElement>(null);
-	const [iframeReady, setIframeReady] = useState(false);
-	const [sceneReady, setSceneReady] = useState(false);
+	const canvasRef = useRef<HTMLDivElement>(null);
 
-	// Texture slots
-	const [textures, setTextures] = useState<Record<MapKey, TextureSlot>>({
-		color: { ...emptySlot },
-		normal: { ...emptySlot },
-		roughness: { ...emptySlot },
-		metalness: { ...emptySlot },
-		ambientocclusion: { ...emptySlot },
-		displacement: { ...emptySlot },
-		opacity: { ...emptySlot },
-	});
+	// Texture slot UI state (thumbnails, paths, info)
+	const [textures, setTextures] = useState<Record<MapKey, TextureSlot>>(
+		Object.fromEntries(MAP_KEYS.map((k) => [k, { ...emptySlot }])) as Record<MapKey, TextureSlot>,
+	);
+
+	// Full-res data URLs sent to Three.js
+	const [textureDataUrls, setTextureDataUrls] = useState<Record<MapKey, string | null>>(
+		{ ...EMPTY_TEXTURES },
+	);
 
 	// Scene controls
 	const [geometry, setGeometry] = useState<GeometryType>("sphere");
 	const defaultNormalType = useSettingsStore((s) => s.settings.default_normal_type);
 	const [normalType, setNormalType] = useState<NormalType>(
-		(defaultNormalType === "directx" ? "directx" : "opengl"),
+		defaultNormalType === "directx" ? "directx" : "opengl",
 	);
 	const [normalScale, setNormalScale] = useState(1.0);
 	const [displacementScale, setDisplacementScale] = useState(0.01);
@@ -83,7 +53,7 @@ export default function MaterialPreviewPanel() {
 	const [clayRender, setClayRender] = useState(false);
 	const [environment, setEnvironment] = useState("field");
 
-	// Loading states — Set allows multiple slots loading in parallel
+	// Loading states
 	const [loadingSlots, setLoadingSlots] = useState<Set<MapKey>>(new Set());
 	const [autofilling, setAutofilling] = useState(false);
 	const inputDir = useSettingsStore((s) => s.settings.input_dir);
@@ -91,89 +61,25 @@ export default function MaterialPreviewPanel() {
 	// Preview store for active file indicators
 	const setMaterialTexturePath = usePreviewStore((s) => s.setMaterialTexturePath);
 
-	// Listen for PBR.ONE ready message
-	useEffect(() => {
-		const handleMessage = (e: MessageEvent) => {
-			if (e.origin !== window.location.origin) return;
-			if (e.data?.type === "packi-pbr-ready") {
-				setIframeReady(true);
-			}
-		};
-		window.addEventListener("message", handleMessage);
-		return () => window.removeEventListener("message", handleMessage);
-	}, []);
+	// Build scene config for the Three.js hook
+	const sceneConfig = useMemo(() => ({
+		geometry,
+		geometrySubdivisions: 500,
+		environment,
+		normalType,
+		normalScale,
+		displacementScale,
+		tilingScale,
+		clayRender,
+		textures: textureDataUrls,
+	}), [geometry, environment, normalType, normalScale, displacementScale, tilingScale, clayRender, textureDataUrls]);
 
-	// Send config to PBR.ONE iframe
-	const sendConfig = useCallback((config: Record<string, unknown>) => {
-		const iframe = iframeRef.current;
-		if (!iframe?.contentWindow) return;
-		iframe.contentWindow.postMessage({ type: "packi-pbr-update", config }, window.location.origin);
-	}, []);
+	const { ready } = useThreeScene(canvasRef, sceneConfig);
 
-	// Push initial config + environment when iframe is ready, then reveal after env loads
-	useEffect(() => {
-		if (!iframeReady) return;
-		const envUrl = `./media/env-${environment}-lq.exr`;
-		sendConfig({
-			geometry_type: geometry,
-			normal_type: normalType,
-			normal_scale: normalScale,
-			displacement_scale: displacementScale,
-			tiling_scale: tilingScale,
-			clayrender_enable: clayRender ? 1 : 0,
-			watermark_enable: 0,
-			gui_enable: -1,
-			fullscreen_enable: 0,
-			environment_url: [envUrl],
-			environment_name: [environment],
-			environment_index: 0,
-		});
-		// Brief delay to let PBR.ONE load the environment map before revealing
-		const timer = setTimeout(() => setSceneReady(true), 800);
-		return () => clearTimeout(timer);
-	}, [iframeReady]);
-
-	// Push control changes
-	useEffect(() => {
-		if (!iframeReady) return;
-		sendConfig({ geometry_type: geometry });
-	}, [geometry, iframeReady, sendConfig]);
-
-	useEffect(() => {
-		if (!iframeReady) return;
-		sendConfig({ normal_type: normalType, normal_scale: normalScale });
-	}, [normalType, normalScale, iframeReady, sendConfig]);
-
-	useEffect(() => {
-		if (!iframeReady) return;
-		sendConfig({ displacement_scale: displacementScale });
-	}, [displacementScale, iframeReady, sendConfig]);
-
-	useEffect(() => {
-		if (!iframeReady) return;
-		sendConfig({ tiling_scale: tilingScale });
-	}, [tilingScale, iframeReady, sendConfig]);
-
-	useEffect(() => {
-		if (!iframeReady) return;
-		sendConfig({ clayrender_enable: clayRender ? 1 : 0 });
-	}, [clayRender, iframeReady, sendConfig]);
-
-	useEffect(() => {
-		if (!iframeReady) return;
-		const envUrl = `./media/env-${environment}-lq.exr`;
-		sendConfig({
-			environment_url: [envUrl],
-			environment_name: [environment],
-			environment_index: 0,
-		});
-	}, [environment, iframeReady, sendConfig]);
-
-	// Load a texture into a slot and push it to PBR.ONE
+	// Load a texture into a slot
 	const loadTexture = useCallback(async (slot: MapKey, path: string) => {
 		setLoadingSlots((prev) => new Set(prev).add(slot));
 		try {
-			// Combined info+thumbnail in one decode, full-res preview in a second
 			const [result, fullRes] = await Promise.all([
 				invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 128 }),
 				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 2048 }),
@@ -185,12 +91,8 @@ export default function MaterialPreviewPanel() {
 			}));
 			setMaterialTexturePath(slot, path);
 
-			// Pass as a data URL so the iframe can load it without cross-origin issues
 			const dataUrl = `data:image/png;base64,${fullRes}`;
-			const pbrKey = mapSlots.find((m) => m.key === slot)?.pbrKey;
-			if (pbrKey) {
-				sendConfig({ [pbrKey]: [dataUrl] });
-			}
+			setTextureDataUrls((prev) => ({ ...prev, [slot]: dataUrl }));
 		} catch (err) {
 			console.error(`Failed to load texture for ${slot}:`, err);
 		}
@@ -199,24 +101,18 @@ export default function MaterialPreviewPanel() {
 			next.delete(slot);
 			return next;
 		});
-	}, [sendConfig, setMaterialTexturePath]);
+	}, [setMaterialTexturePath]);
 
 	// Clear a texture slot
 	const clearTexture = useCallback((slot: MapKey) => {
-		setTextures((prev) => ({
-			...prev,
-			[slot]: { ...emptySlot },
-		}));
+		setTextures((prev) => ({ ...prev, [slot]: { ...emptySlot } }));
 		setMaterialTexturePath(slot, null);
-		const pbrKey = mapSlots.find((m) => m.key === slot)?.pbrKey;
-		if (pbrKey) {
-			sendConfig({ [pbrKey]: [] });
-		}
-	}, [sendConfig, setMaterialTexturePath]);
+		setTextureDataUrls((prev) => ({ ...prev, [slot]: null }));
+	}, [setMaterialTexturePath]);
 
 	// Find the best normal map match for the current normalType setting
 	const findBestNormal = useCallback((files: string[], currentNormalType: NormalType, fallbackNormalType: string | null): string | null => {
-		const normalSlot = mapSlots.find((m) => m.key === "normal")!;
+		const normalSlot = MAP_SLOTS.find((m) => m.key === "normal")!;
 		const candidates = files.filter((filePath) => {
 			const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
 			return normalSlot.keywords.some((kw) => filename.includes(kw));
@@ -225,43 +121,35 @@ export default function MaterialPreviewPanel() {
 		if (candidates.length === 0) return null;
 		if (candidates.length === 1) return candidates[0];
 
-		// Multiple normal candidates — try to match by type
 		const typed = candidates.map((path) => ({
 			path,
 			type: detectNormalType(path.split(/[/\\]/).pop() ?? ""),
 		}));
 
-		// Preferred type: use the current control setting, or fall back to default setting
 		const preferred = currentNormalType ?? (fallbackNormalType === "directx" ? "directx" : "opengl");
-
-		// Look for an exact match for the preferred type
 		const exactMatch = typed.find((t) => t.type === preferred);
 		if (exactMatch) return exactMatch.path;
 
-		// If one is typed and one isn't, prefer the untyped one (it's likely the "default")
 		const untyped = typed.filter((t) => t.type === null);
 		if (untyped.length > 0) return untyped[0].path;
 
-		// Fall back to first alphabetically
 		candidates.sort();
 		return candidates[0];
 	}, []);
 
-	// Autofill: scan input directory for files matching each slot's keywords (parallel)
+	// Autofill: scan input directory for files matching each slot's keywords
 	const handleAutofill = useCallback(async () => {
 		if (!inputDir) return;
 		setAutofilling(true);
 		try {
 			const files = await invoke<string[]>("list_image_files", { dir: inputDir });
 			const loads: Promise<void>[] = [];
-			for (const slot of mapSlots) {
+			for (const slot of MAP_SLOTS) {
 				if (textures[slot.key].path) continue;
 
 				if (slot.key === "normal") {
-					// Smart normal detection
 					const match = findBestNormal(files, normalType, defaultNormalType);
 					if (match) {
-						// Also set the normalType control if we can detect the type from the filename
 						const detectedType = detectNormalType(match.split(/[/\\]/).pop() ?? "");
 						if (detectedType) {
 							setNormalType(detectedType);
@@ -293,7 +181,7 @@ export default function MaterialPreviewPanel() {
 				<div className="px-3 pt-3 pb-2 border-b border-base-300 shrink-0">
 					<div className="text-sm font-semibold text-base-content">3D Material Preview</div>
 					<div className="text-xs text-base-content/40 mt-0.5 leading-snug">
-						Preview PBR materials on 3D geometry with image-based lighting. Powered by PBR.ONE.
+						Preview PBR materials on 3D geometry with image-based lighting.
 					</div>
 				</div>
 
@@ -318,7 +206,7 @@ export default function MaterialPreviewPanel() {
 							<span className="text-xs">Autofill</span>
 						</button>
 					</div>
-					{mapSlots.map((slot) => (
+					{MAP_SLOTS.map((slot) => (
 						<div key={slot.key}>
 							<label className="text-xs text-base-content/50 mb-0.5 block">
 								{slot.label}
@@ -352,7 +240,7 @@ export default function MaterialPreviewPanel() {
 							onChange={(e) => setGeometry(e.target.value as GeometryType)}
 							className="select select-xs select-bordered w-full"
 						>
-							{geometryOptions.map((opt) => (
+							{GEOMETRY_OPTIONS.map((opt) => (
 								<option key={opt.value} value={opt.value}>
 									{opt.label}
 								</option>
@@ -370,7 +258,7 @@ export default function MaterialPreviewPanel() {
 							onChange={(e) => setEnvironment(e.target.value)}
 							className="select select-xs select-bordered w-full"
 						>
-							{environmentOptions.map((opt) => (
+							{ENVIRONMENT_OPTIONS.map((opt) => (
 								<option key={opt.value} value={opt.value}>
 									{opt.label}
 								</option>
@@ -457,17 +345,10 @@ export default function MaterialPreviewPanel() {
 				</div>
 			</div>
 
-			{/* 3D Preview — PBR.ONE iframe */}
+			{/* 3D Preview — direct Three.js canvas */}
 			<div className="flex-1 min-w-0 relative bg-[#1a1a2e]">
-				<iframe
-					ref={iframeRef}
-					src="/pbr-one/material-shading.html#watermark_enable=0&gui_enable=-1&fullscreen_enable=0"
-					className="w-full h-full border-none"
-					title="3D Material Preview"
-				/>
-				{!sceneReady && (
-					<LoadingOverlay />
-				)}
+				<div ref={canvasRef} className="w-full h-full" />
+				{!ready && <LoadingOverlay />}
 			</div>
 		</div>
 	);
