@@ -8,6 +8,8 @@ const SPRITE_SIZE = 120; // size-30 = 7.5rem = 120px
 const BACKFLIP_SPEED = 480; // degrees/sec
 const WOBBLE_FREQ = 3; // oscillations/sec
 const WOBBLE_AMPLITUDE = 12; // degrees
+const RETURN_DURATION = 0.6; // seconds
+const RETURN_ARC_HEIGHT = 250; // pixels above the straight-line path
 
 interface Position {
 	x: number;
@@ -35,10 +37,25 @@ export default function useAlpacaGame() {
 		backflipping: false,
 		backflipAngle: 0,
 		wobbleTime: 0,
+		// Origin (where the logo sits in the layout)
+		originX: 0,
+		originY: 0,
+		// Return animation
+		returning: false,
+		returnProgress: 0,
+		returnStartX: 0,
+		returnStartY: 0,
 	});
 	const keysRef = useRef(new Set<string>());
 	const rafRef = useRef<number>(0);
 	const lastTimeRef = useRef(0);
+
+	const finishDeactivate = useCallback(() => {
+		setActive(false);
+		cancelAnimationFrame(rafRef.current);
+		lastTimeRef.current = 0;
+		keysRef.current.clear();
+	}, []);
 
 	const loop = useCallback((time: number) => {
 		if (!containerRef.current) return;
@@ -47,6 +64,34 @@ export default function useAlpacaGame() {
 		lastTimeRef.current = time;
 
 		const s = stateRef.current;
+
+		// Return animation (tween back to origin with arc + backflip)
+		if (s.returning) {
+			s.returnProgress = Math.min(s.returnProgress + dt / RETURN_DURATION, 1);
+			// Ease-out quad
+			const t = 1 - (1 - s.returnProgress) * (1 - s.returnProgress);
+
+			s.x = s.returnStartX + (s.originX - s.returnStartX) * t;
+			const linearY = s.returnStartY + (s.originY - s.returnStartY) * t;
+			// Parabolic arc (peaks at t=0.5)
+			const arc = RETURN_ARC_HEIGHT * 4 * t * (1 - t);
+			s.y = linearY - arc;
+
+			const rot = -360 * t;
+
+			setPosition({ x: s.x, y: s.y });
+			setFacing("right");
+			setRotation(rot);
+
+			if (s.returnProgress >= 1) {
+				finishDeactivate();
+				return;
+			}
+
+			rafRef.current = requestAnimationFrame(loop);
+			return;
+		}
+
 		const keys = keysRef.current;
 		const bounds = containerRef.current.getBoundingClientRect();
 		const maxX = bounds.width - SPRITE_SIZE;
@@ -128,7 +173,7 @@ export default function useAlpacaGame() {
 		setRotation(rot);
 
 		rafRef.current = requestAnimationFrame(loop);
-	}, []);
+	}, [finishDeactivate]);
 
 	const activate = useCallback(() => {
 		if (!containerRef.current || !logoRef.current) return;
@@ -149,6 +194,12 @@ export default function useAlpacaGame() {
 			backflipping: true,
 			backflipAngle: 0,
 			wobbleTime: 0,
+			originX: startX,
+			originY: startY,
+			returning: false,
+			returnProgress: 0,
+			returnStartX: 0,
+			returnStartY: 0,
 		};
 
 		setPosition({ x: startX, y: startY });
@@ -158,9 +209,12 @@ export default function useAlpacaGame() {
 	}, []);
 
 	const deactivate = useCallback(() => {
-		setActive(false);
-		cancelAnimationFrame(rafRef.current);
-		lastTimeRef.current = 0;
+		const s = stateRef.current;
+		if (s.returning) return;
+		s.returning = true;
+		s.returnProgress = 0;
+		s.returnStartX = s.x;
+		s.returnStartY = s.y;
 		keysRef.current.clear();
 	}, []);
 
