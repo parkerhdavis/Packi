@@ -14,7 +14,7 @@ Packi isn't a replacement for any DCC; rather, it's a helpful sidecar for textur
 - **Styling:** Tailwind CSS 4 + daisyUI 5
 - **State Management:** Zustand 5
 - **Image Processing:** Rust `image` + `exr` crates, parallelized with `rayon`
-- **3D Rendering:** Three.js (WebGL) via PBR.ONE
+- **3D Rendering:** Three.js (WebGL) - h/t PBR.ONE for original reference
 
 
 ## Modules
