@@ -17,7 +17,7 @@ export interface DirEntry {
 }
 
 export type ModuleName =
-	| "channel-packer"
+	| "pack"
 	| "adjust"
 	| "tiling"
 	| "file-sizing"

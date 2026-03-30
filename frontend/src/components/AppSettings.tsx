@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { useChannelPackerStore } from "@/stores/channelPackerStore";
+import { usePackStore } from "@/stores/packStore";
 import PageHeader from "@/components/ui/PageHeader";
 import { LuFolderOpen, LuPlus, LuTrash2 } from "react-icons/lu";
 
@@ -41,7 +41,7 @@ const emptyForm = {
 export default function AppSettings() {
 	const { settings, save, toggleTheme, zoomIn, zoomOut, zoomReset } = useSettingsStore();
 	const zoom = settings.zoom ?? 100;
-	const refreshPackerPresets = useChannelPackerStore((s) => s.loadPresets);
+	const refreshPackerPresets = usePackStore((s) => s.loadPresets);
 
 	const [builtinPresets, setBuiltinPresets] = useState<PackingPreset[]>([]);
 	const [userPresets, setUserPresets] = useState<PackingPreset[]>([]);

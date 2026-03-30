@@ -30,6 +30,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 	load: async () => {
 		try {
 			const settings = await invoke<AppSettings>("load_settings");
+			// Migrate renamed modules
+			if (settings.last_module === "channel-packer") settings.last_module = "pack";
+			if (settings.last_module === "normal-tools") settings.last_module = "adjust";
 			applyTheme(settings.theme);
 			applyZoom(settings.zoom);
 			set({ settings, loaded: true });

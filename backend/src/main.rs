@@ -15,7 +15,10 @@ use batch::{
 	delete_pipeline_preset, list_image_files, load_pipeline_presets, preview_batch, run_batch,
 	save_pipeline_preset,
 };
-use channel_pack::{export_packed, pack_channels};
+use channel_pack::{
+	export_packed, export_swizzled, export_unpacked, pack_channels, swizzle_channels,
+	unpack_channels,
+};
 use image_io::{list_directory, load_image_as_base64, load_image_channel, load_image_info};
 use normal_map::{blend_normals, export_normal_result, flip_normal_green, height_to_normal, normalize_map};
 use pipeline::{apply_adjust_pipeline, export_pipeline_result};
@@ -86,6 +89,10 @@ fn main() {
 			list_directory,
 			pack_channels,
 			export_packed,
+			unpack_channels,
+			export_unpacked,
+			swizzle_channels,
+			export_swizzled,
 			get_builtin_presets,
 			load_user_presets,
 			save_user_preset,

@@ -12,7 +12,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
-	activeModule: "channel-packer",
+	activeModule: "adjust",
 	sidebarOpen: true,
 	historySidebarOpen: false,
 
