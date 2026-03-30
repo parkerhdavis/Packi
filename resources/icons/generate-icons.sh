@@ -20,9 +20,9 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PUBLIC_DIR="$PROJECT_ROOT/frontend/public"
 
 # Source files
-APP_ICON="packi-icon-fullres.png"                # Main app icon (square base)
-SPLASH_DARK="packi-icon-fullres-trans-inv.png"   # Splash screen icon (dark mode)
-SPLASH_LIGHT="packi-icon-fullres-trans.png"      # Splash screen icon (light mode)
+APP_ICON="packi-icon-fullres-bg.png"               # Main app icon (with background)
+SPLASH_DARK="packi-icon-fullres-trans-fordark.png"   # Splash screen icon (for dark backgrounds)
+SPLASH_LIGHT="packi-icon-fullres-trans-forlight.png" # Splash screen icon (for light backgrounds)
 
 cd "$SCRIPT_DIR"
 
