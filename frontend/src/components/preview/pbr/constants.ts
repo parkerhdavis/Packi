@@ -93,7 +93,11 @@ export const MAP_SLOTS = [
 /** Detect normal map convention from filename */
 export function detectNormalType(filename: string): NormalType | null {
 	const lower = filename.toLowerCase();
-	if (lower.includes("directx") || lower.includes("_dx") || lower.includes("-dx") || lower.includes(".dx")) return "directx";
-	if (lower.includes("opengl") || lower.includes("_gl") || lower.includes("-gl") || lower.includes(".gl")) return "opengl";
+	// Full word match (highest confidence)
+	if (lower.includes("directx")) return "directx";
+	if (lower.includes("opengl")) return "opengl";
+	// Abbreviation match
+	if (lower.includes("dx")) return "directx";
+	if (lower.includes("gl")) return "opengl";
 	return null;
 }

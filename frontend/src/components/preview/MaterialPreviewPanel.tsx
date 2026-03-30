@@ -13,7 +13,6 @@ import {
 	GEOMETRY_OPTIONS,
 	ENVIRONMENT_OPTIONS,
 	MAP_SLOTS,
-	detectNormalType,
 } from "@/components/preview/pbr/constants";
 
 interface TextureSlot {
@@ -111,7 +110,7 @@ export default function MaterialPreviewPanel() {
 	}, [setMaterialTexturePath]);
 
 	// Find the best normal map match for the current normalType setting
-	const findBestNormal = useCallback((files: string[], currentNormalType: NormalType, fallbackNormalType: string | null): string | null => {
+	const findBestNormal = useCallback((files: string[], currentNormalType: NormalType): string | null => {
 		const normalSlot = MAP_SLOTS.find((m) => m.key === "normal")!;
 		const candidates = files.filter((filePath) => {
 			const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
@@ -119,20 +118,23 @@ export default function MaterialPreviewPanel() {
 		});
 
 		if (candidates.length === 0) return null;
+
+		const getFilename = (path: string) => path.split(/[/\\]/).pop()?.toLowerCase() ?? "";
+
+		// 1. Look for "DirectX" / "OpenGL" full word in filename matching current type
+		const fullWord = currentNormalType === "directx" ? "directx" : "opengl";
+		const fullWordMatch = candidates.find((p) => getFilename(p).includes(fullWord));
+		if (fullWordMatch) return fullWordMatch;
+
+		// 2. Look for "DX" / "GL" abbreviation in filename matching current type
+		const abbrev = currentNormalType === "directx" ? "dx" : "gl";
+		const abbrevMatch = candidates.find((p) => getFilename(p).includes(abbrev));
+		if (abbrevMatch) return abbrevMatch;
+
+		// 3. If only one normal file, use it
 		if (candidates.length === 1) return candidates[0];
 
-		const typed = candidates.map((path) => ({
-			path,
-			type: detectNormalType(path.split(/[/\\]/).pop() ?? ""),
-		}));
-
-		const preferred = currentNormalType ?? (fallbackNormalType === "directx" ? "directx" : "opengl");
-		const exactMatch = typed.find((t) => t.type === preferred);
-		if (exactMatch) return exactMatch.path;
-
-		const untyped = typed.filter((t) => t.type === null);
-		if (untyped.length > 0) return untyped[0].path;
-
+		// 4. Multiple files, none matched — use first alphabetically
 		candidates.sort();
 		return candidates[0];
 	}, []);
@@ -148,12 +150,8 @@ export default function MaterialPreviewPanel() {
 				if (textures[slot.key].path) continue;
 
 				if (slot.key === "normal") {
-					const match = findBestNormal(files, normalType, defaultNormalType);
+					const match = findBestNormal(files, normalType);
 					if (match) {
-						const detectedType = detectNormalType(match.split(/[/\\]/).pop() ?? "");
-						if (detectedType) {
-							setNormalType(detectedType);
-						}
 						loads.push(loadTexture("normal", match));
 					}
 				} else {
@@ -171,7 +169,7 @@ export default function MaterialPreviewPanel() {
 			console.error("Autofill failed:", err);
 		}
 		setAutofilling(false);
-	}, [inputDir, textures, loadTexture, normalType, defaultNormalType, findBestNormal]);
+	}, [inputDir, textures, loadTexture, normalType, findBestNormal]);
 
 	return (
 		<div className="flex flex-1 min-w-0">
