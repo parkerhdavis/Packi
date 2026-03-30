@@ -1,6 +1,8 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useSettingsStore } from "@/stores/settingsStore";
 import DropZone from "@/components/ui/DropZone";
+import { LuWand } from "react-icons/lu";
 import type { ImageInfo } from "@/types";
 
 type GeometryType = "plane" | "cube" | "sphere" | "cylinder" | "torus";
@@ -32,13 +34,13 @@ interface TextureSlot {
 const emptySlot: TextureSlot = { path: null, preview: null, info: null };
 
 const mapSlots = [
-	{ key: "color", label: "Color (Albedo)", pbrKey: "color_url" },
-	{ key: "normal", label: "Normal Map", pbrKey: "normal_url" },
-	{ key: "roughness", label: "Roughness", pbrKey: "roughness_url" },
-	{ key: "metalness", label: "Metalness", pbrKey: "metalness_url" },
-	{ key: "ambientocclusion", label: "Ambient Occlusion", pbrKey: "ambientocclusion_url" },
-	{ key: "displacement", label: "Displacement", pbrKey: "displacement_url" },
-	{ key: "opacity", label: "Opacity", pbrKey: "opacity_url" },
+	{ key: "color", label: "Color (Albedo)", pbrKey: "color_url", keywords: ["color", "albedo", "basecolor", "base_color", "diffuse"] },
+	{ key: "normal", label: "Normal Map", pbrKey: "normal_url", keywords: ["normal", "norm", "nrm"] },
+	{ key: "roughness", label: "Roughness", pbrKey: "roughness_url", keywords: ["roughness", "rough"] },
+	{ key: "metalness", label: "Metalness", pbrKey: "metalness_url", keywords: ["metalness", "metallic", "metal"] },
+	{ key: "ambientocclusion", label: "Ambient Occlusion", pbrKey: "ambientocclusion_url", keywords: ["ambientocclusion", "ao", "occlusion"] },
+	{ key: "displacement", label: "Displacement", pbrKey: "displacement_url", keywords: ["displacement", "disp", "height"] },
+	{ key: "opacity", label: "Opacity", pbrKey: "opacity_url", keywords: ["opacity", "alpha", "transparency"] },
 ] as const;
 
 type MapKey = typeof mapSlots[number]["key"];
@@ -69,6 +71,8 @@ export default function MaterialPreviewPanel() {
 
 	// Loading states
 	const [loadingSlot, setLoadingSlot] = useState<MapKey | null>(null);
+	const [autofilling, setAutofilling] = useState(false);
+	const inputDir = useSettingsStore((s) => s.settings.input_dir);
 
 	// Listen for PBR.ONE ready message
 	useEffect(() => {
@@ -184,6 +188,30 @@ export default function MaterialPreviewPanel() {
 		}
 	}, [sendConfig]);
 
+	// Autofill: scan input directory for files matching each slot's keywords
+	const handleAutofill = useCallback(async () => {
+		if (!inputDir) return;
+		setAutofilling(true);
+		try {
+			const files = await invoke<string[]>("list_image_files", { dir: inputDir });
+			for (const slot of mapSlots) {
+				// Skip slots that already have a texture
+				if (textures[slot.key].path) continue;
+				// Find first file whose name (case-insensitive) contains any keyword
+				const match = files.find((filePath) => {
+					const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
+					return slot.keywords.some((kw) => filename.includes(kw));
+				});
+				if (match) {
+					await loadTexture(slot.key, match);
+				}
+			}
+		} catch (err) {
+			console.error("Autofill failed:", err);
+		}
+		setAutofilling(false);
+	}, [inputDir, textures, loadTexture]);
+
 	return (
 		<div className="flex flex-1 min-w-0">
 			{/* Controls */}
@@ -198,9 +226,25 @@ export default function MaterialPreviewPanel() {
 
 				{/* Texture inputs */}
 				<div className="p-3 space-y-2 border-b border-base-300">
-					<label className="text-xs font-semibold text-base-content/50 block">
-						Texture Maps
-					</label>
+					<div className="flex items-center justify-between">
+						<label className="text-xs font-semibold text-base-content/50">
+							Texture Maps
+						</label>
+						<button
+							type="button"
+							onClick={handleAutofill}
+							disabled={!inputDir || autofilling}
+							className="btn btn-ghost btn-xs h-6 min-h-0 px-2 gap-1"
+							title={inputDir ? "Auto-detect textures from the input directory by filename" : "Set an input directory in the sidebar first"}
+						>
+							{autofilling ? (
+								<span className="loading loading-spinner loading-xs" />
+							) : (
+								<LuWand size={12} />
+							)}
+							<span className="text-xs">Autofill</span>
+						</button>
+					</div>
 					{mapSlots.map((slot) => (
 						<div key={slot.key}>
 							<label className="text-xs text-base-content/50 mb-0.5 block">
