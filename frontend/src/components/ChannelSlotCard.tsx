@@ -1,7 +1,7 @@
 import { usePackStore } from "@/stores/packStore";
 import type { ChannelSource } from "@/types";
 import DropZone from "@/components/ui/DropZone";
-import { LuRefreshCw } from "react-icons/lu";
+
 
 const channelColors: Record<string, string> = {
 	r: "border-red-500",
@@ -73,14 +73,14 @@ export default function ChannelSlotCard({ slot, label }: ChannelSlotCardProps) {
 						))}
 					</select>
 
-					<label className="flex items-center gap-1 cursor-pointer">
+					<label className="flex items-center gap-1.5 cursor-pointer">
 						<input
 							type="checkbox"
 							checked={channel.invert}
 							onChange={() => toggleInvert(slot)}
 							className="checkbox checkbox-xs checkbox-primary"
 						/>
-						<LuRefreshCw size={12} className="text-base-content/50" />
+						<span className="text-xs text-base-content/50">Invert</span>
 					</label>
 
 					<span className="text-xs text-base-content/40">

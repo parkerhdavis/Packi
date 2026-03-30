@@ -112,8 +112,8 @@ export default function App() {
 	// Splash: wait for settings to load, fade in icon+text, linger, then fade out
 	useEffect(() => {
 		if (!loaded) return;
-		const fadeTimer = setTimeout(() => setFadeOut(true), 2600);
-		const doneTimer = setTimeout(() => setSplashDone(true), 3000);
+		const fadeTimer = setTimeout(() => setFadeOut(true), 2100);
+		const doneTimer = setTimeout(() => setSplashDone(true), 2500);
 		return () => {
 			clearTimeout(fadeTimer);
 			clearTimeout(doneTimer);

@@ -1,7 +1,7 @@
 import { usePackStore } from "@/stores/packStore";
 import DropZone from "@/components/ui/DropZone";
 import type { ChannelSource } from "@/types";
-import { LuRefreshCw } from "react-icons/lu";
+
 
 const channelRows = [
 	{ key: "r" as const, label: "R", dotColor: "bg-red-500" },
@@ -76,14 +76,14 @@ export default function SwizzlePanel() {
 								</option>
 							))}
 						</select>
-						<label className="flex items-center gap-1 cursor-pointer">
+						<label className="flex items-center gap-1.5 cursor-pointer">
 							<input
 								type="checkbox"
 								checked={swizzleMappings[ch.key].invert}
 								onChange={() => toggleSwizzleInvert(ch.key)}
 								className="checkbox checkbox-xs checkbox-primary"
 							/>
-							<LuRefreshCw size={12} className="text-base-content/50" />
+							<span className="text-xs text-base-content/50">Invert</span>
 						</label>
 					</div>
 				))}
