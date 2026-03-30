@@ -98,7 +98,20 @@ pub fn preview_batch(files: Vec<String>, pipeline: BatchPipeline) -> Result<Vec<
 
 /// Execute the batch pipeline on all files.
 #[tauri::command]
-pub fn run_batch(
+pub async fn run_batch(
+	files: Vec<String>,
+	pipeline: BatchPipeline,
+	output_dir: String,
+	app_handle: tauri::AppHandle,
+) -> Result<BatchResult, String> {
+	tokio::task::spawn_blocking(move || {
+		run_batch_sync(files, pipeline, output_dir, app_handle)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
+fn run_batch_sync(
 	files: Vec<String>,
 	pipeline: BatchPipeline,
 	output_dir: String,
@@ -157,13 +170,15 @@ fn process_single_file(
 
 	let mut img = load_dynamic_image(file_path)?;
 	let mut output_name = stem.to_string();
-	let mut output_format = ext.to_string();
+	let mut output_ext = ext.to_string();
+	let mut save_format = ext.to_string();
 	let mut bit_depth = 8u8;
 
 	for step in &pipeline.steps {
 		match step {
 			BatchStep::Convert { format, bit_depth: bd } => {
-				output_format = format_to_extension(format);
+				output_ext = format_to_extension(format);
+				save_format = format.clone();
 				bit_depth = *bd;
 			}
 			BatchStep::Resize { mode, width, height, filter } => {
@@ -191,13 +206,13 @@ fn process_single_file(
 				}
 			}
 			BatchStep::Rename { pattern } => {
-				output_name = apply_rename_pattern(pattern, stem, &output_format, idx);
+				output_name = apply_rename_pattern(pattern, stem, &output_ext, idx);
 			}
 		}
 	}
 
-	let output_path = Path::new(output_dir).join(format!("{}.{}", output_name, output_format));
-	save_image(&img, output_path.to_str().unwrap_or(""), &output_format, bit_depth)
+	let output_path = Path::new(output_dir).join(format!("{}.{}", output_name, output_ext));
+	save_image(&img, output_path.to_str().unwrap_or(""), &save_format, bit_depth)
 }
 
 fn format_to_extension(format: &str) -> String {

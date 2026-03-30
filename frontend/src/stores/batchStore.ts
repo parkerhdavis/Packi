@@ -74,7 +74,6 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 	addFiles: (paths) => {
 		set((s) => ({
 			inputFiles: [...s.inputFiles, ...paths.filter((p) => !s.inputFiles.includes(p))],
-			previewItems: [],
 			result: null,
 		}));
 	},
@@ -91,7 +90,6 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 	removeFile: (index) => {
 		set((s) => ({
 			inputFiles: s.inputFiles.filter((_, i) => i !== index),
-			previewItems: [],
 		}));
 	},
 
@@ -100,21 +98,18 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 	addStep: (step) => {
 		set((s) => ({
 			pipeline: [...s.pipeline, step],
-			previewItems: [],
 		}));
 	},
 
 	removeStep: (index) => {
 		set((s) => ({
 			pipeline: s.pipeline.filter((_, i) => i !== index),
-			previewItems: [],
 		}));
 	},
 
 	updateStep: (index, step) => {
 		set((s) => ({
 			pipeline: s.pipeline.map((s, i) => (i === index ? step : s)),
-			previewItems: [],
 		}));
 	},
 
@@ -123,7 +118,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 			const steps = [...s.pipeline];
 			const [moved] = steps.splice(from, 1);
 			steps.splice(to, 0, moved);
-			return { pipeline: steps, previewItems: [] };
+			return { pipeline: steps };
 		});
 	},
 

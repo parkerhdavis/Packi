@@ -49,6 +49,7 @@
 							]
 						},
 						"core:path:allow-resolve-directory",
+						"core:event:allow-listen",
 						"opener:allow-open-url"
 					]
 				}

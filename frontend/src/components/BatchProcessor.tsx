@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useBatchStore } from "@/stores/batchStore";
 import { useToastStore } from "@/stores/toastStore";
 import PageHeader from "@/components/ui/PageHeader";
-import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuEye, LuUpload } from "react-icons/lu";
+import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuUpload, LuCheck, LuX } from "react-icons/lu";
 
 const stepTypes = [
 	{ type: "convert" as const, label: "Convert Format" },
@@ -39,6 +39,18 @@ export default function BatchProcessor() {
 	useEffect(() => {
 		loadPresets();
 	}, [loadPresets]);
+
+	// Auto-refresh preview when inputs or pipeline change
+	useEffect(() => {
+		if (inputFiles.length === 0 || pipeline.length === 0) {
+			useBatchStore.setState({ previewItems: [] });
+			return;
+		}
+		const timer = setTimeout(() => {
+			previewPipeline();
+		}, 300);
+		return () => clearTimeout(timer);
+	}, [inputFiles, pipeline, previewPipeline]);
 
 	const handleAddFiles = useCallback(async () => {
 		const result = await open({
@@ -239,15 +251,6 @@ export default function BatchProcessor() {
 						<div className="flex gap-2">
 							<button
 								type="button"
-								onClick={previewPipeline}
-								disabled={inputFiles.length === 0 || pipeline.length === 0}
-								className="btn btn-sm btn-ghost flex-1"
-							>
-								<LuEye size={14} />
-								Preview
-							</button>
-							<button
-								type="button"
 								onClick={handleRun}
 								disabled={inputFiles.length === 0 || pipeline.length === 0 || !outputDir || running}
 								className="btn btn-sm btn-primary flex-1"
@@ -258,65 +261,79 @@ export default function BatchProcessor() {
 						</div>
 					</div>
 
-					{/* Progress */}
-					{running && progress && (
-						<div className="px-3 py-2 border-b border-base-300">
-							<div className="flex justify-between text-xs text-base-content/50 mb-1">
-								<span>{progress.current} / {progress.total}</span>
-								<span className="truncate ml-2">{progress.current_file.split(/[\\/]/).pop()}</span>
-							</div>
-							<progress
-								className="progress progress-primary w-full"
-								value={progress.current}
-								max={progress.total}
-							/>
-						</div>
-					)}
-
-					{/* Result */}
-					{result && !running && (
-						<div className="px-3 py-2 border-b border-base-300">
-							<p className="text-sm">
-								<span className="text-success font-semibold">{result.processed}</span> processed
-								{result.failed.length > 0 && (
-									<span>, <span className="text-error font-semibold">{result.failed.length}</span> failed</span>
-								)}
-							</p>
-						</div>
-					)}
-
 					{/* Preview table */}
 					<div className="flex-1 overflow-y-auto">
 						{previewItems.length > 0 ? (
 							<table className="table table-xs w-full">
 								<thead>
 									<tr>
+										{(running || result) && <th className="w-6" />}
 										<th>Input</th>
 										<th>Output</th>
 										<th>Format</th>
 									</tr>
 								</thead>
 								<tbody>
-									{previewItems.map((item, i) => (
-										<tr key={`preview-${i}`}>
-											<td className="truncate max-w-32 text-xs">{item.input_path.split(/[\\/]/).pop()}</td>
-											<td className="text-xs font-mono">{item.output_filename}</td>
-											<td className="text-xs">{item.output_format}</td>
-										</tr>
-									))}
+									{previewItems.map((item, i) => {
+										const done = running
+											? progress != null && i < progress.current
+											: result != null;
+										const failed = result?.failed.some((f) => f.path === item.input_path);
+										const active = running && progress != null && i === progress.current;
+										return (
+											<tr key={`preview-${i}`}>
+												{(running || result) && (
+													<td className="w-6 px-1">
+														{done && !failed && <LuCheck size={12} className="text-success" />}
+														{done && failed && <LuX size={12} className="text-error" />}
+														{active && <span className="loading loading-spinner loading-xs" />}
+													</td>
+												)}
+												<td className="truncate max-w-32 text-xs">{item.input_path.split(/[\\/]/).pop()}</td>
+												<td className="text-xs font-mono">{item.output_filename}</td>
+												<td className="text-xs">{item.output_format}</td>
+											</tr>
+										);
+									})}
 								</tbody>
 							</table>
 						) : (
 							<div className="flex items-center justify-center h-full text-base-content/30 text-sm">
-								{inputFiles.length > 0 && pipeline.length > 0
-									? "Click Preview to see output"
-									: "Add files and pipeline steps to begin"
-								}
+								Add files and pipeline steps to begin
 							</div>
 						)}
 					</div>
 				</div>
 			</div>
+
+			{/* Progress / Result bar */}
+			{(running || result) && (
+				<div className="px-3 py-2 border-t border-base-300 flex items-center gap-3">
+					{running && progress && (
+						<>
+							<span className="text-xs text-base-content/50 shrink-0">
+								{progress.current} / {progress.total}
+							</span>
+							<progress
+								className="progress progress-primary flex-1"
+								value={progress.current}
+								max={progress.total}
+							/>
+							<span className="text-xs text-base-content/50 truncate max-w-48">
+								{progress.current_file.split(/[\\/]/).pop()}
+							</span>
+						</>
+					)}
+					{result && !running && (
+						<p className="text-xs">
+							<span className="text-success font-semibold">{result.processed}</span> processed
+							{result.failed.length > 0 && (
+								<span>, <span className="text-error font-semibold">{result.failed.length}</span> failed</span>
+							)}
+						</p>
+					)}
+				</div>
+			)}
 		</div>
 	);
 }

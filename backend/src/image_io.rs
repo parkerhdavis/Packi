@@ -147,7 +147,7 @@ pub fn save_image(
 	let output_path = Path::new(path);
 
 	match format {
-		"png8" => {
+		"png" | "png8" => {
 			let rgba = img.to_rgba8();
 			rgba.save(output_path)
 				.map_err(|e| format!("Failed to save PNG: {}", e))?;
@@ -162,7 +162,7 @@ pub fn save_image(
 			rgba.save_with_format(output_path, ImageFormat::Tga)
 				.map_err(|e| format!("Failed to save TGA: {}", e))?;
 		}
-		"jpeg" => {
+		"jpg" | "jpeg" => {
 			let rgb = img.to_rgb8();
 			rgb.save(output_path)
 				.map_err(|e| format!("Failed to save JPEG: {}", e))?;
