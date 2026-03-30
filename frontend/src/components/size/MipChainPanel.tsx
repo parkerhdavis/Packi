@@ -1,6 +1,9 @@
-import { useMemo, useEffect, useState, useRef, useCallback } from "react";
+import { useMemo, useEffect, useState, useRef } from "react";
 import { useSizeStore } from "@/stores/sizeStore";
 import { computeMipLevels, GPU_FORMATS, formatBytes } from "@/components/size/vramFormats";
+
+const MIN_COL_WIDTH = 28;
+const GAP = 12;
 
 export default function MipChainPanel() {
 	const info = useSizeStore((s) => s.inputInfo);
@@ -30,51 +33,62 @@ export default function MipChainPanel() {
 		return () => observer.disconnect();
 	}, []);
 
-	// Generate mip previews incrementally
+	// Generate mip previews asynchronously, smallest first for fast visual feedback
 	useEffect(() => {
 		if (!preview || mipLevels.length === 0) {
 			setMipPreviews([]);
 			return;
 		}
 
-		// Start with all nulls (loading state)
+		// Immediately show all spinners
 		setMipPreviews(new Array(mipLevels.length).fill(null));
 
-		const img = new Image();
 		let cancelled = false;
 
-		img.onload = () => {
+		// Defer image load to ensure spinner state paints first
+		const raf = requestAnimationFrame(() => {
 			if (cancelled) return;
 
-			// Generate each mip level one at a time, yielding to the event loop between each
-			let i = 0;
-			const generateNext = () => {
-				if (cancelled || i >= mipLevels.length) return;
-				const lvl = mipLevels[i];
-				const canvas = document.createElement("canvas");
-				canvas.width = lvl.width;
-				canvas.height = lvl.height;
-				const ctx = canvas.getContext("2d")!;
-				ctx.imageSmoothingEnabled = true;
-				ctx.imageSmoothingQuality = "high";
-				ctx.drawImage(img, 0, 0, lvl.width, lvl.height);
-				const dataUrl = canvas.toDataURL("image/png");
+			const img = new Image();
+			img.onload = () => {
+				if (cancelled) return;
 
-				const idx = i;
-				setMipPreviews((prev) => {
-					const next = [...prev];
-					next[idx] = dataUrl;
-					return next;
-				});
+				// Process smallest mips first (they're near-instant)
+				const indices = mipLevels.map((_, i) => i).reverse();
+				let pos = 0;
 
-				i++;
-				requestAnimationFrame(generateNext);
+				const generateNext = () => {
+					if (cancelled || pos >= indices.length) return;
+					const idx = indices[pos];
+					const lvl = mipLevels[idx];
+					const canvas = document.createElement("canvas");
+					canvas.width = lvl.width;
+					canvas.height = lvl.height;
+					const ctx = canvas.getContext("2d")!;
+					ctx.imageSmoothingEnabled = true;
+					ctx.imageSmoothingQuality = "high";
+					ctx.drawImage(img, 0, 0, lvl.width, lvl.height);
+					const dataUrl = canvas.toDataURL("image/png");
+
+					setMipPreviews((prev) => {
+						const next = [...prev];
+						next[idx] = dataUrl;
+						return next;
+					});
+
+					pos++;
+					// Yield to let the browser paint between mips
+					setTimeout(generateNext, 0);
+				};
+				generateNext();
 			};
-			requestAnimationFrame(generateNext);
-		};
-		img.src = preview.startsWith("data:") ? preview : `data:image/png;base64,${preview}`;
+			img.src = preview.startsWith("data:") ? preview : `data:image/png;base64,${preview}`;
+		});
 
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+			cancelAnimationFrame(raf);
+		};
 	}, [preview, mipLevels]);
 
 	if (!info) {
@@ -87,11 +101,26 @@ export default function MipChainPanel() {
 
 	const totalSize = mipLevels.reduce((sum, lvl) => sum + format.sizeBytes(lvl.width, lvl.height), 0);
 
-	// Scale so the cascade fills the available width with some padding
-	const totalCascadeWidth = mipLevels.reduce((sum, lvl) => sum + lvl.width, 0)
-		+ (mipLevels.length - 1) * 12; // gap
-	const availableWidth = containerWidth - 32; // padding
-	const scale = Math.min(1, availableWidth / totalCascadeWidth);
+	// Compute scale so all mips fit in a single row
+	const availableWidth = containerWidth - 32;
+	const totalNativeWidth = mipLevels.reduce((sum, lvl) => sum + lvl.width, 0);
+	const totalGaps = (mipLevels.length - 1) * GAP;
+
+	let scale = Math.min(1, (availableWidth - totalGaps) / totalNativeWidth);
+	// Iteratively account for mips that hit minimum column width
+	for (let iter = 0; iter < 3; iter++) {
+		let sumLarge = 0;
+		let countMin = 0;
+		for (const lvl of mipLevels) {
+			if (lvl.width * scale < MIN_COL_WIDTH) {
+				countMin++;
+			} else {
+				sumLarge += lvl.width;
+			}
+		}
+		if (countMin === 0 || sumLarge === 0) break;
+		scale = Math.min(1, (availableWidth - totalGaps - countMin * MIN_COL_WIDTH) / sumLarge);
+	}
 
 	return (
 		<div className="flex-1 min-w-0 flex flex-col">
@@ -123,41 +152,43 @@ export default function MipChainPanel() {
 				</div>
 			</div>
 
-			{/* Mip cascade */}
-			<div ref={containerRef} className="flex-1 overflow-auto p-4">
-				<div className="flex flex-wrap items-end gap-3">
+			{/* Mip cascade — single row, bottom-aligned */}
+			<div ref={containerRef} className="flex-1 overflow-hidden p-4 flex items-end">
+				<div className="flex items-end" style={{ gap: GAP }}>
 					{mipLevels.map((lvl, i) => {
-						const displayW = Math.max(8, Math.round(lvl.width * scale));
-						const displayH = Math.max(8, Math.round(lvl.height * scale));
+						const displayW = Math.max(MIN_COL_WIDTH, Math.round(lvl.width * scale));
+						const imgW = Math.max(4, Math.round(lvl.width * scale));
+						const imgH = Math.max(4, Math.round(lvl.height * scale));
 						const levelSize = format.sizeBytes(lvl.width, lvl.height);
 						const loaded = mipPreviews[i] != null;
 
 						return (
-							<div key={i} className="flex flex-col items-center gap-1">
+							<div key={i} className="flex flex-col items-center gap-1 shrink-0" style={{ width: displayW }}>
 								{/* Mip image */}
 								<div
 									className="bg-base-300/30 rounded border border-base-300/50 overflow-hidden flex items-center justify-center"
-									style={{
-										width: displayW,
-										height: displayH,
-										minWidth: 8,
-										minHeight: 8,
-									}}
+									style={{ width: imgW, height: imgH }}
 								>
 									{loaded ? (
 										<img
 											src={mipPreviews[i]!}
 											alt={`Mip ${i}`}
 											className="w-full h-full"
-											style={{ imageRendering: displayW < 32 ? "pixelated" : "auto" }}
+											style={{ imageRendering: imgW < 32 ? "pixelated" : "auto" }}
 										/>
 									) : (
-										<span className="loading loading-spinner" style={{ width: Math.min(16, displayW - 4), height: Math.min(16, displayH - 4) }} />
+										<span
+											className="loading loading-spinner"
+											style={{
+												width: Math.min(16, imgW - 2),
+												height: Math.min(16, imgH - 2),
+											}}
+										/>
 									)}
 								</div>
 
 								{/* Labels */}
-								<div className="text-center">
+								<div className="text-center whitespace-nowrap">
 									<div className="text-xs font-mono text-base-content/60">
 										{lvl.width}×{lvl.height}
 									</div>
