@@ -6,7 +6,7 @@ import PackTools from "@/components/PackTools";
 import AdjustTools from "@/components/AdjustTools";
 import BatchProcessor from "@/components/BatchProcessor";
 import PreviewTools from "@/components/PreviewTools";
-import FileSizing from "@/components/FileSizing";
+import SizeTools from "@/components/SizeTools";
 import AppSettings from "@/components/AppSettings";
 import StatusBar from "@/components/ui/StatusBar";
 import ToastContainer from "@/components/ui/ToastContainer";
@@ -76,7 +76,7 @@ export default function App() {
 			if (e.key === "1") { e.preventDefault(); setModule("adjust"); }
 			else if (e.key === "2") { e.preventDefault(); setModule("pack"); }
 			else if (e.key === "3") { e.preventDefault(); setModule("preview"); }
-			else if (e.key === "4") { e.preventDefault(); setModule("file-sizing"); }
+			else if (e.key === "4") { e.preventDefault(); setModule("size"); }
 			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
 			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
 			else if (e.key === "\\") { e.preventDefault(); useAppStore.getState().toggleHistorySidebar(); }
@@ -148,8 +148,8 @@ export default function App() {
 				return <AdjustTools />;
 			case "preview":
 				return <PreviewTools />;
-			case "file-sizing":
-				return <FileSizing />;
+			case "size":
+				return <SizeTools />;
 			case "batch-processor":
 				return <BatchProcessor />;
 			case "settings":
