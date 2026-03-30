@@ -14,7 +14,8 @@ Packi isn't a replacement for any DCC; rather, it's a helpful sidecar for textur
 - **Styling:** Tailwind CSS 4 + daisyUI 5
 - **State Management:** Zustand 5
 - **Image Processing:** Rust `image` + `exr` crates, parallelized with `rayon`
-- **3D Rendering:** Three.js (WebGL) - h/t PBR.ONE for original reference
+- **3D Rendering:** Three.js (WebGL) 
+    - h/t PBR.ONE for original reference
 
 
 ## Modules
@@ -80,7 +81,7 @@ Visualize textures in 2D tiling and 3D material contexts.
 - Seam highlight overlay with adjustable color
 - Pan and zoom with fit-to-window
 
-**3D Material Preview** - Powered by PBR.ONE
+**3D Material Preview**
 - PBR previewing on multiple geometries: plane, cube, sphere, cylinder, torus
 - Seven texture map slots: color, normal, roughness, metalness, AO, displacement, opacity
 - Auto-fill from loaded textures
