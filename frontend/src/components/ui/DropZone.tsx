@@ -42,6 +42,7 @@ export default function DropZone({
 
 	const handleDragOver = useCallback((e: React.DragEvent) => {
 		e.preventDefault();
+		e.dataTransfer.dropEffect = "copy";
 		setDragOver(true);
 	}, []);
 
