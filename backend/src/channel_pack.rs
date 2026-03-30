@@ -2,7 +2,7 @@ use image::{DynamicImage, GenericImageView, RgbaImage};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::image_io::{encode_to_base64_png, load_dynamic_image, save_image};
+use crate::image_io::{encode_to_base64_png, load_dynamic_image, maybe_resize, save_image};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelSourceConfig {
@@ -30,17 +30,7 @@ pub async fn pack_channels(
 ) -> Result<String, String> {
 	tokio::task::spawn_blocking(move || {
 		let packed = do_pack(&config)?;
-		let img = DynamicImage::ImageRgba8(packed);
-		let preview = if let Some(max_size) = max_preview_size {
-			let (w, h) = img.dimensions();
-			if w > max_size || h > max_size {
-				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-			} else {
-				img
-			}
-		} else {
-			img
-		};
+		let preview = maybe_resize(DynamicImage::ImageRgba8(packed), max_preview_size);
 		encode_to_base64_png(&preview)
 	})
 	.await
@@ -175,18 +165,7 @@ pub async fn unpack_channels(
 	max_preview_size: Option<u32>,
 ) -> Result<UnpackResult, String> {
 	tokio::task::spawn_blocking(move || {
-		let img = load_dynamic_image(&path)?;
-		let img = if let Some(max_size) = max_preview_size {
-			let (w, h) = img.dimensions();
-			if w > max_size || h > max_size {
-				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-			} else {
-				img
-			}
-		} else {
-			img
-		};
-
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
 		let rgba = img.to_rgba8();
 		let (w, h) = rgba.dimensions();
 
@@ -299,17 +278,7 @@ pub async fn swizzle_channels(
 	max_preview_size: Option<u32>,
 ) -> Result<String, String> {
 	tokio::task::spawn_blocking(move || {
-		let img = load_dynamic_image(&path)?;
-		let img = if let Some(max_size) = max_preview_size {
-			let (w, h) = img.dimensions();
-			if w > max_size || h > max_size {
-				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-			} else {
-				img
-			}
-		} else {
-			img
-		};
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
 		let result = do_swizzle(&img, &config);
 		encode_to_base64_png(&DynamicImage::ImageRgba8(result))
 	})

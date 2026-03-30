@@ -64,19 +64,7 @@ pub async fn load_image_as_base64(
 }
 
 fn load_image_as_base64_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
-	let img = load_dynamic_image(path)?;
-
-	let img = if let Some(max_size) = max_preview_size {
-		let (w, h) = img.dimensions();
-		if w > max_size || h > max_size {
-			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-		} else {
-			img
-		}
-	} else {
-		img
-	};
-
+	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
 	encode_to_base64_png(&img)
 }
 
@@ -135,6 +123,20 @@ pub fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 		.map_err(|e| format!("Failed to encode PNG: {}", e))?;
 
 	Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
+}
+
+/// Optionally downscale an image to fit within `max_size` on its longest axis.
+pub fn maybe_resize(img: DynamicImage, max_size: Option<u32>) -> DynamicImage {
+	if let Some(max_size) = max_size {
+		let (w, h) = img.dimensions();
+		if w > max_size || h > max_size {
+			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+		} else {
+			img
+		}
+	} else {
+		img
+	}
 }
 
 /// Save a DynamicImage to the specified path and format.

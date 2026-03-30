@@ -1,20 +1,6 @@
-use image::{DynamicImage, GenericImageView, RgbaImage};
+use image::{DynamicImage, RgbaImage};
 
-use crate::image_io::{encode_to_base64_png, load_dynamic_image, save_image};
-
-/// Optionally downscale an image to fit within `max_size` on its longest axis.
-fn maybe_resize(img: DynamicImage, max_size: Option<u32>) -> DynamicImage {
-	if let Some(max_size) = max_size {
-		let (w, h) = img.dimensions();
-		if w > max_size || h > max_size {
-			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-		} else {
-			img
-		}
-	} else {
-		img
-	}
-}
+use crate::image_io::{encode_to_base64_png, load_dynamic_image, maybe_resize, save_image};
 
 // --- Pure in-memory image-processing functions ---
 
