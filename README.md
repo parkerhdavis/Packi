@@ -80,8 +80,8 @@ Visualize textures in 2D tiling and 3D material contexts.
 - Seam highlight overlay with adjustable color
 - Pan and zoom with fit-to-window
 
-**3D Material Preview**
-- PBR rendering on multiple geometries: plane, cube, sphere, cylinder, torus
+**3D Material Preview** - Powered by PBR.ONE
+- PBR previewing on multiple geometries: plane, cube, sphere, cylinder, torus
 - Seven texture map slots: color, normal, roughness, metalness, AO, displacement, opacity
 - Auto-fill from loaded textures
 - Six environment map presets (Studio, Dune, Forest, Field, Lab, Night)
