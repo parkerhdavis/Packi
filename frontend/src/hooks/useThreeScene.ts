@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { PBRSceneConfig, PBRSceneStatus } from "@/types/pbr";
 import { PBRSceneManager } from "@/components/preview/pbr/PBRSceneManager";
 
@@ -34,5 +34,9 @@ export function useThreeScene(
 		managerRef.current?.updateConfig(config);
 	}, [config]);
 
-	return { ready };
+	const captureViewport = useCallback((): string | null => {
+		return managerRef.current?.captureViewport() ?? null;
+	}, []);
+
+	return { ready, captureViewport };
 }

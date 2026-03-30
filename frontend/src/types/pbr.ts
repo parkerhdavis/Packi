@@ -27,4 +27,10 @@ export interface PBRSceneConfig {
 
 export interface PBRSceneStatus {
 	ready: boolean;
+	captureViewport: () => string | null;
+}
+
+/** Shared imperative handle for preview panels that support viewport export. */
+export interface PreviewPanelHandle {
+	captureViewport: () => string | null;
 }

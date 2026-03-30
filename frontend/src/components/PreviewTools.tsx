@@ -1,7 +1,13 @@
+import { useRef, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "@/stores/appStore";
 import { usePreviewStore } from "@/stores/previewStore";
+import { useToastStore } from "@/stores/toastStore";
 import type { PreviewSubmodule } from "@/stores/previewStore";
+import type { ExportConfig } from "@/types";
+import type { PreviewPanelHandle } from "@/types/pbr";
 import PageHeader from "@/components/ui/PageHeader";
+import ExportPanel from "@/components/ui/ExportPanel";
 import HistorySidebar from "@/components/HistorySidebar";
 import TilingPreviewPanel from "@/components/preview/TilingPreviewPanel";
 import MaterialPreviewPanel from "@/components/preview/MaterialPreviewPanel";
@@ -16,6 +22,37 @@ export default function PreviewTools() {
 	const activeSubmodule = usePreviewStore((s) => s.activeSubmodule);
 	const setActiveSubmodule = usePreviewStore((s) => s.setSubmodule);
 	const historySidebarOpen = useAppStore((s) => s.historySidebarOpen);
+	const addToast = useToastStore((s) => s.addToast);
+
+	const tilingInputPath = usePreviewStore((s) => s.tilingInputPath);
+	const materialTexturePaths = usePreviewStore((s) => s.materialTexturePaths);
+
+	const tilingRef = useRef<PreviewPanelHandle>(null);
+	const materialRef = useRef<PreviewPanelHandle>(null);
+
+	const exportDisabled = activeSubmodule === "2d"
+		? !tilingInputPath
+		: !Object.values(materialTexturePaths).some(Boolean);
+
+	const handleExport = useCallback(async (config: ExportConfig) => {
+		const panelRef = activeSubmodule === "2d" ? tilingRef : materialRef;
+		const data = panelRef.current?.captureViewport();
+		if (!data) {
+			addToast("Nothing to export — load a texture first", "warning");
+			return;
+		}
+
+		const ext = config.format === "png8" || config.format === "png16" ? ".png"
+			: config.format === "tga" ? ".tga"
+			: config.format === "jpeg" ? ".jpg"
+			: ".png";
+		const outputPath = `${config.directory}/${config.filename}${ext}`;
+
+		await invoke("save_viewport", { data, outputPath, format: config.format });
+		addToast(`Exported to ${config.filename}${ext}`, "success");
+	}, [activeSubmodule, addToast]);
+
+	const defaultFilename = activeSubmodule === "2d" ? "tiling_preview" : "material_preview";
 
 	return (
 		<div className="flex flex-col h-full">
@@ -57,9 +94,20 @@ export default function PreviewTools() {
 				</div>
 
 				{/* Content area */}
-				<div className="flex-1 min-w-0 flex">
-					{activeSubmodule === "2d" && <TilingPreviewPanel />}
-					{activeSubmodule === "3d" && <MaterialPreviewPanel />}
+				<div className="flex-1 min-w-0 flex relative">
+					{activeSubmodule === "2d" && <TilingPreviewPanel ref={tilingRef} />}
+					{activeSubmodule === "3d" && <MaterialPreviewPanel ref={materialRef} />}
+
+					{/* Export overlay — bottom-right of viewport */}
+					<div className="absolute bottom-3 right-3 z-20 w-64">
+						<ExportPanel
+							formats={["png8", "jpeg"]}
+							defaultFormat="png8"
+							onExport={handleExport}
+							disabled={exportDisabled}
+							filenameDefault={defaultFilename}
+						/>
+					</div>
 				</div>
 
 				{/* History sidebar */}

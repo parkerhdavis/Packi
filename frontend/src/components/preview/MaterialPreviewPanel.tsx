@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useMemo } from "react";
+import { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePreviewStore } from "@/stores/previewStore";
@@ -6,7 +6,7 @@ import DropZone from "@/components/ui/DropZone";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { LuWand } from "react-icons/lu";
 import type { ImageInfo, ImageWithPreview } from "@/types";
-import type { GeometryType, MapKey, NormalType } from "@/types/pbr";
+import type { GeometryType, MapKey, NormalType, PreviewPanelHandle } from "@/types/pbr";
 import { MAP_KEYS } from "@/types/pbr";
 import { useThreeScene } from "@/hooks/useThreeScene";
 import {
@@ -27,7 +27,7 @@ const EMPTY_TEXTURES: Record<MapKey, string | null> = Object.fromEntries(
 	MAP_KEYS.map((k) => [k, null]),
 ) as Record<MapKey, string | null>;
 
-export default function MaterialPreviewPanel() {
+const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPreviewPanel(_props, ref) {
 	const canvasRef = useRef<HTMLDivElement>(null);
 
 	// Texture slot UI state (thumbnails, paths, info)
@@ -73,7 +73,9 @@ export default function MaterialPreviewPanel() {
 		textures: textureDataUrls,
 	}), [geometry, environment, normalType, normalScale, displacementScale, tilingScale, clayRender, textureDataUrls]);
 
-	const { ready } = useThreeScene(canvasRef, sceneConfig);
+	const { ready, captureViewport } = useThreeScene(canvasRef, sceneConfig);
+
+	useImperativeHandle(ref, () => ({ captureViewport }), [captureViewport]);
 
 	// Load a texture into a slot
 	const loadTexture = useCallback(async (slot: MapKey, path: string) => {
@@ -350,4 +352,6 @@ export default function MaterialPreviewPanel() {
 			</div>
 		</div>
 	);
-}
+});
+
+export default MaterialPreviewPanel;
