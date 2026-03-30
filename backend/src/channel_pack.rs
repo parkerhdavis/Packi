@@ -304,6 +304,7 @@ pub async fn export_swizzled(
 }
 
 /// Find the maximum resolution among all source images.
+/// Uses header-only reads to avoid fully decoding each image.
 fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 	let mut max_w = 0u32;
 	let mut max_h = 0u32;
@@ -312,8 +313,8 @@ fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 		.into_iter()
 		.flatten()
 	{
-		let img = load_dynamic_image(&cfg.path)?;
-		let (w, h) = img.dimensions();
+		let (w, h) = image::image_dimensions(&cfg.path)
+			.map_err(|e| format!("Failed to read image dimensions for {}: {}", cfg.path, e))?;
 		max_w = max_w.max(w);
 		max_h = max_h.max(h);
 	}
