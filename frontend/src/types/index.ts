@@ -36,7 +36,7 @@ export interface ImageInfo {
 
 export type ChannelSource = "r" | "g" | "b" | "a" | "luminance";
 
-export type ExportFormat = "png8" | "png16" | "tga" | "jpeg" | "exr";
+export type ExportFormat = "png8" | "png16" | "tga" | "jpeg";
 
 export interface ExportConfig {
 	format: ExportFormat;

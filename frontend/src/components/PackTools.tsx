@@ -46,9 +46,7 @@ export default function PackTools() {
 			const ext = config.format === "png8" || config.format === "png16" ? ".png"
 				: config.format === "tga" ? ".tga"
 				: config.format === "jpeg" ? ".jpg"
-				: config.format === "exr" ? ".exr"
 				: ".png";
-			const bitDepth = config.format === "png16" ? 16 : 8;
 
 			switch (usePackStore.getState().activeSubmodule) {
 				case "unpack":
@@ -61,13 +59,13 @@ export default function PackTools() {
 					break;
 				case "swizzle": {
 					const outputPath = `${config.directory}/${config.filename}${ext}`;
-					await exportSwizzled(outputPath, config.format, bitDepth);
+					await exportSwizzled(outputPath, config.format);
 					addToast(`Exported to ${config.filename}${ext}`, "success");
 					break;
 				}
 				case "pack": {
 					const outputPath = `${config.directory}/${config.filename}${ext}`;
-					await exportPacked(outputPath, config.format, bitDepth);
+					await exportPacked(outputPath, config.format);
 					addToast(`Exported to ${config.filename}${ext}`, "success");
 					break;
 				}

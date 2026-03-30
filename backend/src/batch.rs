@@ -172,14 +172,12 @@ fn process_single_file(
 	let mut output_name = stem.to_string();
 	let mut output_ext = ext.to_string();
 	let mut save_format = ext.to_string();
-	let mut bit_depth = 8u8;
 
 	for step in &pipeline.steps {
 		match step {
-			BatchStep::Convert { format, bit_depth: bd } => {
+			BatchStep::Convert { format, .. } => {
 				output_ext = format_to_extension(format);
 				save_format = format.clone();
-				bit_depth = *bd;
 			}
 			BatchStep::Resize { mode, width, height, filter } => {
 				let filter_type = match filter.as_str() {
@@ -212,7 +210,10 @@ fn process_single_file(
 	}
 
 	let output_path = Path::new(output_dir).join(format!("{}.{}", output_name, output_ext));
-	save_image(&img, output_path.to_str().unwrap_or(""), &save_format, bit_depth)
+	let output_str = output_path
+		.to_str()
+		.ok_or_else(|| format!("Output path contains invalid UTF-8: {:?}", output_path))?;
+	save_image(&img, output_str, &save_format)
 }
 
 fn format_to_extension(format: &str) -> String {
@@ -247,7 +248,7 @@ pub fn list_image_files(dir: String) -> Result<Vec<String>, String> {
 		return Err(format!("Not a directory: {}", dir));
 	}
 
-	let supported = ["png", "tga", "jpg", "jpeg", "tif", "tiff", "bmp"];
+	let supported = ["png", "tga", "jpg", "jpeg", "tif", "tiff", "bmp", "exr"];
 	let mut files = Vec::new();
 
 	collect_image_files(path, &supported, &mut files)?;

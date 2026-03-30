@@ -2,7 +2,7 @@ use image::{DynamicImage, GenericImageView, RgbaImage};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::image_io::{encode_to_base64_png, load_dynamic_image, save_image};
+use crate::image_io::{encode_to_base64_png, load_dynamic_image, maybe_resize, save_image};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChannelSourceConfig {
@@ -30,17 +30,7 @@ pub async fn pack_channels(
 ) -> Result<String, String> {
 	tokio::task::spawn_blocking(move || {
 		let packed = do_pack(&config)?;
-		let img = DynamicImage::ImageRgba8(packed);
-		let preview = if let Some(max_size) = max_preview_size {
-			let (w, h) = img.dimensions();
-			if w > max_size || h > max_size {
-				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-			} else {
-				img
-			}
-		} else {
-			img
-		};
+		let preview = maybe_resize(DynamicImage::ImageRgba8(packed), max_preview_size);
 		encode_to_base64_png(&preview)
 	})
 	.await
@@ -53,7 +43,6 @@ pub async fn export_packed(
 	config: PackConfig,
 	output_path: String,
 	format: String,
-	bit_depth: u8,
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
 		let packed = do_pack(&config)?;
@@ -61,7 +50,6 @@ pub async fn export_packed(
 			&DynamicImage::ImageRgba8(packed),
 			&output_path,
 			&format,
-			bit_depth,
 		)
 	})
 	.await
@@ -177,18 +165,7 @@ pub async fn unpack_channels(
 	max_preview_size: Option<u32>,
 ) -> Result<UnpackResult, String> {
 	tokio::task::spawn_blocking(move || {
-		let img = load_dynamic_image(&path)?;
-		let img = if let Some(max_size) = max_preview_size {
-			let (w, h) = img.dimensions();
-			if w > max_size || h > max_size {
-				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-			} else {
-				img
-			}
-		} else {
-			img
-		};
-
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
 		let rgba = img.to_rgba8();
 		let (w, h) = rgba.dimensions();
 
@@ -228,9 +205,21 @@ pub async fn export_unpacked(
 		let (w, h) = rgba.dimensions();
 		let mut gray = image::GrayImage::new(w, h);
 		for (x, y, pixel) in rgba.enumerate_pixels() {
-			gray.put_pixel(x, y, image::Luma([pixel[channel as usize]]));
+			let val = match channel {
+				0 => pixel[0],
+				1 => pixel[1],
+				2 => pixel[2],
+				3 => pixel[3],
+				_ => {
+					let r = pixel[0] as f32;
+					let g = pixel[1] as f32;
+					let b = pixel[2] as f32;
+					(0.2126 * r + 0.7152 * g + 0.0722 * b).round() as u8
+				}
+			};
+			gray.put_pixel(x, y, image::Luma([val]));
 		}
-		save_image(&DynamicImage::ImageLuma8(gray), &output_path, &format, 8)
+		save_image(&DynamicImage::ImageLuma8(gray), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
@@ -289,17 +278,7 @@ pub async fn swizzle_channels(
 	max_preview_size: Option<u32>,
 ) -> Result<String, String> {
 	tokio::task::spawn_blocking(move || {
-		let img = load_dynamic_image(&path)?;
-		let img = if let Some(max_size) = max_preview_size {
-			let (w, h) = img.dimensions();
-			if w > max_size || h > max_size {
-				img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
-			} else {
-				img
-			}
-		} else {
-			img
-		};
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
 		let result = do_swizzle(&img, &config);
 		encode_to_base64_png(&DynamicImage::ImageRgba8(result))
 	})
@@ -314,18 +293,18 @@ pub async fn export_swizzled(
 	config: SwizzleConfig,
 	output_path: String,
 	format: String,
-	bit_depth: u8,
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
 		let img = load_dynamic_image(&path)?;
 		let result = do_swizzle(&img, &config);
-		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format, bit_depth)
+		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
 }
 
 /// Find the maximum resolution among all source images.
+/// Uses header-only reads to avoid fully decoding each image.
 fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 	let mut max_w = 0u32;
 	let mut max_h = 0u32;
@@ -334,8 +313,8 @@ fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 		.into_iter()
 		.flatten()
 	{
-		let img = load_dynamic_image(&cfg.path)?;
-		let (w, h) = img.dimensions();
+		let (w, h) = image::image_dimensions(&cfg.path)
+			.map_err(|e| format!("Failed to read image dimensions for {}: {}", cfg.path, e))?;
 		max_w = max_w.max(w);
 		max_h = max_h.max(h);
 	}

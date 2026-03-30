@@ -28,9 +28,13 @@ use tauri::Manager;
 use tracing_subscriber::EnvFilter;
 
 fn init_logging() {
-	let log_dir = dirs::config_dir()
-		.map(|d| d.join("packi").join("logs"))
-		.expect("Could not determine config directory");
+	let log_dir = match dirs::config_dir() {
+		Some(d) => d.join("packi").join("logs"),
+		None => {
+			eprintln!("Warning: could not determine config directory, logging to /tmp/packi/logs");
+			std::path::PathBuf::from("/tmp/packi/logs")
+		}
+	};
 	std::fs::create_dir_all(&log_dir).ok();
 
 	let file_appender = tracing_appender::rolling::daily(&log_dir, "packi.log");

@@ -115,7 +115,7 @@ interface PackStoreState {
 	setSwizzleMapping: (channel: SlotName, source: ChannelSource) => void;
 	toggleSwizzleInvert: (channel: SlotName) => void;
 	regenerateSwizzlePreview: () => void;
-	exportSwizzled: (outputPath: string, format: string, bitDepth: number) => Promise<void>;
+	exportSwizzled: (outputPath: string, format: string) => Promise<void>;
 
 	// Pack
 	packChannels: { r: ChannelSlot | null; g: ChannelSlot | null; b: ChannelSlot | null; a: ChannelSlot | null };
@@ -134,7 +134,7 @@ interface PackStoreState {
 	clearPreset: () => void;
 	loadPresets: () => Promise<void>;
 	regeneratePackPreview: () => void;
-	exportPacked: (outputPath: string, format: string, bitDepth: number) => Promise<void>;
+	exportPacked: (outputPath: string, format: string) => Promise<void>;
 }
 
 let swizzleDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -291,7 +291,7 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 		}, 300);
 	},
 
-	exportSwizzled: async (outputPath, format, bitDepth) => {
+	exportSwizzled: async (outputPath, format) => {
 		const { swizzleInputPath, swizzleMappings } = get();
 		if (!swizzleInputPath) return;
 		await invoke("export_swizzled", {
@@ -308,7 +308,6 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 			},
 			outputPath,
 			format,
-			bitDepth,
 		});
 	},
 
@@ -475,7 +474,7 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 		}, 300);
 	},
 
-	exportPacked: async (outputPath, format, bitDepth) => {
+	exportPacked: async (outputPath, format) => {
 		const { packChannels, packTargetResolution } = get();
 
 		const makeConfig = (ch: ChannelSlot | null) => {
@@ -497,7 +496,6 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 			},
 			outputPath,
 			format,
-			bitDepth,
 		});
 	},
 }));
