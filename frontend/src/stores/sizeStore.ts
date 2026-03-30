@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import type { ImageInfo } from "@/types";
+import type { ImageInfo, ImageWithPreview } from "@/types";
 
 type SizeSubmodule = "info" | "vram" | "mipchain";
 
@@ -31,11 +31,8 @@ export const useSizeStore = create<SizeStoreState>((set) => ({
 	loadInput: async (path) => {
 		set({ inputLoading: true });
 		try {
-			const [info, preview] = await Promise.all([
-				invoke<ImageInfo>("load_image_info", { path }),
-				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 1024 }),
-			]);
-			set({ inputPath: path, inputInfo: info, inputPreview: preview, inputLoading: false });
+			const result = await invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 1024 });
+			set({ inputPath: path, inputInfo: result.info, inputPreview: result.preview, inputLoading: false });
 		} catch (err) {
 			console.error("Failed to load image:", err);
 			set({ inputLoading: false });

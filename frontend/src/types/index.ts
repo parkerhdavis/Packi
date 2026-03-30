@@ -34,6 +34,11 @@ export interface ImageInfo {
 	file_size: number;
 }
 
+export interface ImageWithPreview {
+	info: ImageInfo;
+	preview: string;
+}
+
 export type ChannelSource = "r" | "g" | "b" | "a" | "luminance";
 
 export type ExportFormat = "png8" | "png16" | "tga" | "jpeg";
