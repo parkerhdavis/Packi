@@ -1,0 +1,38 @@
+import { useEffect, useRef, useState } from "react";
+import type { PBRSceneConfig, PBRSceneStatus } from "@/types/pbr";
+import { PBRSceneManager } from "@/components/preview/pbr/PBRSceneManager";
+
+export function useThreeScene(
+	containerRef: React.RefObject<HTMLDivElement | null>,
+	config: PBRSceneConfig,
+): PBRSceneStatus {
+	const [ready, setReady] = useState(false);
+	const managerRef = useRef<PBRSceneManager | null>(null);
+
+	// Mount / unmount the scene manager
+	useEffect(() => {
+		const el = containerRef.current;
+		if (!el) return;
+
+		const manager = new PBRSceneManager(el, () => setReady(true));
+		managerRef.current = manager;
+
+		// ResizeObserver for container-based sizing
+		const ro = new ResizeObserver(() => manager.resize());
+		ro.observe(el);
+
+		return () => {
+			ro.disconnect();
+			manager.dispose();
+			managerRef.current = null;
+			setReady(false);
+		};
+	}, [containerRef]);
+
+	// Push config updates to the manager
+	useEffect(() => {
+		managerRef.current?.updateConfig(config);
+	}, [config]);
+
+	return { ready };
+}
