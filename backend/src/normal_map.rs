@@ -69,12 +69,14 @@ pub fn blend_normals_on_image(
 ) -> RgbaImage {
 	let (w, h) = rgba_a.dimensions();
 
+	let resized;
 	let rgba_b = if rgba_b.dimensions() != (w, h) {
-		image::DynamicImage::ImageRgba8(rgba_b.clone())
+		resized = image::DynamicImage::ImageRgba8(rgba_b.clone())
 			.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
-			.to_rgba8()
+			.to_rgba8();
+		&resized
 	} else {
-		rgba_b.clone()
+		rgba_b
 	};
 
 	let mut result = RgbaImage::new(w, h);
@@ -200,12 +202,6 @@ pub async fn blend_normals(
 		let img_a = maybe_resize(load_dynamic_image(&path_a)?, max_preview_size);
 		let img_b = load_dynamic_image(&path_b)?;
 		let rgba_a = img_a.to_rgba8();
-		let (w, h) = rgba_a.dimensions();
-		let img_b = if img_b.dimensions() != (w, h) {
-			img_b.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
-		} else {
-			img_b
-		};
 		let rgba_b = img_b.to_rgba8();
 		let result = blend_normals_on_image(&rgba_a, &rgba_b, blend_factor);
 		encode_to_base64_png(&DynamicImage::ImageRgba8(result))
