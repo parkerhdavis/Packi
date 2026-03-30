@@ -94,6 +94,7 @@ export default function MaterialPreviewPanel() {
 	// Listen for PBR.ONE ready message
 	useEffect(() => {
 		const handleMessage = (e: MessageEvent) => {
+			if (e.origin !== window.location.origin) return;
 			if (e.data?.type === "packi-pbr-ready") {
 				setIframeReady(true);
 			}
@@ -106,7 +107,7 @@ export default function MaterialPreviewPanel() {
 	const sendConfig = useCallback((config: Record<string, unknown>) => {
 		const iframe = iframeRef.current;
 		if (!iframe?.contentWindow) return;
-		iframe.contentWindow.postMessage({ type: "packi-pbr-update", config }, "*");
+		iframe.contentWindow.postMessage({ type: "packi-pbr-update", config }, window.location.origin);
 	}, []);
 
 	// Push initial config + environment when iframe is ready, then reveal after env loads
