@@ -466,7 +466,7 @@ export default function MaterialPreviewPanel() {
 					title="3D Material Preview"
 				/>
 				{!sceneReady && (
-					<LoadingOverlay bgClass="bg-[#1a1a2e]" />
+					<LoadingOverlay />
 				)}
 			</div>
 		</div>
