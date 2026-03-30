@@ -44,7 +44,7 @@ export class PBRSceneManager {
 		container.appendChild(this.renderer.domElement);
 
 		// Mesh with default plane geometry
-		const material = new THREE.MeshPhysicalMaterial({ transparent: true });
+		const material = new THREE.MeshPhysicalMaterial();
 		this.mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1, 1), material);
 		this.scene.add(this.mesh);
 
@@ -243,11 +243,18 @@ export class PBRSceneManager {
 				if (active) {
 					mat[active[0]] = active[1];
 				}
+				// Enable transparency only when an opacity map is present
+				if (mapKey === "opacity") {
+					this.mesh.material.transparent = true;
+				}
 			} else {
 				// Apply inactive defaults
 				const inactive = MAP_INACTIVE_SETTINGS[mapKey];
 				if (inactive) {
 					mat[inactive[0]] = inactive[1];
+				}
+				if (mapKey === "opacity") {
+					this.mesh.material.transparent = false;
 				}
 			}
 
