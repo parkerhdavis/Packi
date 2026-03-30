@@ -86,7 +86,7 @@ pub async fn export_pipeline_result(
 			rgba = apply_step(rgba, step)?;
 		}
 
-		save_image(&DynamicImage::ImageRgba8(rgba), &output_path, &format, 8)
+		save_image(&DynamicImage::ImageRgba8(rgba), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?

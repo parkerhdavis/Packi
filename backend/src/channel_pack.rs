@@ -53,7 +53,6 @@ pub async fn export_packed(
 	config: PackConfig,
 	output_path: String,
 	format: String,
-	bit_depth: u8,
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
 		let packed = do_pack(&config)?;
@@ -61,7 +60,6 @@ pub async fn export_packed(
 			&DynamicImage::ImageRgba8(packed),
 			&output_path,
 			&format,
-			bit_depth,
 		)
 	})
 	.await
@@ -242,7 +240,7 @@ pub async fn export_unpacked(
 			};
 			gray.put_pixel(x, y, image::Luma([val]));
 		}
-		save_image(&DynamicImage::ImageLuma8(gray), &output_path, &format, 8)
+		save_image(&DynamicImage::ImageLuma8(gray), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
@@ -326,12 +324,11 @@ pub async fn export_swizzled(
 	config: SwizzleConfig,
 	output_path: String,
 	format: String,
-	bit_depth: u8,
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
 		let img = load_dynamic_image(&path)?;
 		let result = do_swizzle(&img, &config);
-		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format, bit_depth)
+		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?

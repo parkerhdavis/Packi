@@ -269,7 +269,7 @@ pub async fn export_normal_result(
 			_ => return Err(format!("Unknown operation: {}", operation)),
 		};
 
-		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format, 8)
+		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?

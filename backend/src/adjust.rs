@@ -128,7 +128,7 @@ pub async fn export_adjust_result(
 			_ => return Err(format!("Unknown adjust operation: {}", operation)),
 		};
 
-		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format, 8)
+		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
