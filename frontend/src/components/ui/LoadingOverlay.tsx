@@ -8,8 +8,8 @@ interface LoadingOverlayProps {
 }
 
 export default function LoadingOverlay({
-	size = 40,
-	bgClass = "bg-base-100/80",
+	size = 120,
+	bgClass = "bg-[#0D1013]",
 }: LoadingOverlayProps) {
 	const theme = useSettingsStore((s) => s.settings.theme);
 	const icon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
