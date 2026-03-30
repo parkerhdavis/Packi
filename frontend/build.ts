@@ -45,6 +45,7 @@ if (cssProc.exitCode !== 0) {
 // Main application bundle
 // ---------------------------------------------------------------------------
 console.log("  -> Building main app...");
+const pkg = await Bun.file("package.json").json();
 const mainResult = await Bun.build({
 	entrypoints: ["src/main.tsx"],
 	outdir: DIST,
@@ -54,6 +55,7 @@ const mainResult = await Bun.build({
 	sourcemap: isDebug ? "linked" : "none",
 	define: {
 		"process.env.NODE_ENV": isDebug ? '"development"' : '"production"',
+		"__APP_VERSION__": JSON.stringify(pkg.version),
 	},
 });
 if (!mainResult.success) {

@@ -8,6 +8,7 @@ export interface AppSettings {
 	sidebar_open: boolean | null;
 	input_dir: string | null;
 	output_dir: string | null;
+	default_normal_type: string | null;
 }
 
 export interface DirEntry {

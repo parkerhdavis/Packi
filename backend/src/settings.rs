@@ -32,6 +32,9 @@ pub struct AppSettings {
 	/// Working output directory.
 	#[serde(default)]
 	pub output_dir: Option<String>,
+	/// Default normal map type: "opengl" or "directx".
+	#[serde(default)]
+	pub default_normal_type: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

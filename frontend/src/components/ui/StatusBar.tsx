@@ -20,7 +20,7 @@ export default function StatusBar() {
 	return (
 		<footer className="flex items-center justify-between h-7 px-3 bg-base-200 border-t border-base-300 text-xs text-base-content/50 select-none shrink-0">
 			<div className="flex items-center gap-2">
-				<span className="text-base-content/40">Packi v0.1.0</span>
+				<span className="text-base-content/40">Packi v{__APP_VERSION__}</span>
 			</div>
 
 			<div className="flex items-center gap-1">

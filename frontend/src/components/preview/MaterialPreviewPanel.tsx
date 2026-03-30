@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { usePreviewStore } from "@/stores/previewStore";
 import DropZone from "@/components/ui/DropZone";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { LuWand } from "react-icons/lu";
@@ -46,6 +47,14 @@ const mapSlots = [
 
 type MapKey = typeof mapSlots[number]["key"];
 
+/** Check if a filename indicates a specific normal type */
+function detectNormalType(filename: string): NormalType | null {
+	const lower = filename.toLowerCase();
+	if (lower.includes("directx") || lower.includes("_dx") || lower.includes("-dx") || lower.includes(".dx")) return "directx";
+	if (lower.includes("opengl") || lower.includes("_gl") || lower.includes("-gl") || lower.includes(".gl")) return "opengl";
+	return null;
+}
+
 export default function MaterialPreviewPanel() {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [iframeReady, setIframeReady] = useState(false);
@@ -64,17 +73,23 @@ export default function MaterialPreviewPanel() {
 
 	// Scene controls
 	const [geometry, setGeometry] = useState<GeometryType>("sphere");
-	const [normalType, setNormalType] = useState<NormalType>("opengl");
+	const defaultNormalType = useSettingsStore((s) => s.settings.default_normal_type);
+	const [normalType, setNormalType] = useState<NormalType>(
+		(defaultNormalType === "directx" ? "directx" : "opengl"),
+	);
 	const [normalScale, setNormalScale] = useState(1.0);
 	const [displacementScale, setDisplacementScale] = useState(0.01);
 	const [tilingScale, setTilingScale] = useState(1.0);
 	const [clayRender, setClayRender] = useState(false);
 	const [environment, setEnvironment] = useState("field");
 
-	// Loading states
-	const [loadingSlot, setLoadingSlot] = useState<MapKey | null>(null);
+	// Loading states — Set allows multiple slots loading in parallel
+	const [loadingSlots, setLoadingSlots] = useState<Set<MapKey>>(new Set());
 	const [autofilling, setAutofilling] = useState(false);
 	const inputDir = useSettingsStore((s) => s.settings.input_dir);
+
+	// Preview store for active file indicators
+	const setMaterialTexturePath = usePreviewStore((s) => s.setMaterialTexturePath);
 
 	// Listen for PBR.ONE ready message
 	useEffect(() => {
@@ -155,7 +170,7 @@ export default function MaterialPreviewPanel() {
 
 	// Load a texture into a slot and push it to PBR.ONE
 	const loadTexture = useCallback(async (slot: MapKey, path: string) => {
-		setLoadingSlot(slot);
+		setLoadingSlots((prev) => new Set(prev).add(slot));
 		try {
 			// Load thumbnail for the slot UI + full-res for the 3D preview
 			const [info, thumbnail, fullRes] = await Promise.all([
@@ -168,6 +183,7 @@ export default function MaterialPreviewPanel() {
 				...prev,
 				[slot]: { path, preview: thumbnail, info },
 			}));
+			setMaterialTexturePath(slot, path);
 
 			// Pass as a data URL so the iframe can load it without cross-origin issues
 			const dataUrl = `data:image/png;base64,${fullRes}`;
@@ -178,8 +194,12 @@ export default function MaterialPreviewPanel() {
 		} catch (err) {
 			console.error(`Failed to load texture for ${slot}:`, err);
 		}
-		setLoadingSlot(null);
-	}, [sendConfig]);
+		setLoadingSlots((prev) => {
+			const next = new Set(prev);
+			next.delete(slot);
+			return next;
+		});
+	}, [sendConfig, setMaterialTexturePath]);
 
 	// Clear a texture slot
 	const clearTexture = useCallback((slot: MapKey) => {
@@ -187,13 +207,46 @@ export default function MaterialPreviewPanel() {
 			...prev,
 			[slot]: { ...emptySlot },
 		}));
+		setMaterialTexturePath(slot, null);
 		const pbrKey = mapSlots.find((m) => m.key === slot)?.pbrKey;
 		if (pbrKey) {
 			sendConfig({ [pbrKey]: [] });
 		}
-	}, [sendConfig]);
+	}, [sendConfig, setMaterialTexturePath]);
 
-	// Autofill: scan input directory for files matching each slot's keywords
+	// Find the best normal map match for the current normalType setting
+	const findBestNormal = useCallback((files: string[], currentNormalType: NormalType, fallbackNormalType: string | null): string | null => {
+		const normalSlot = mapSlots.find((m) => m.key === "normal")!;
+		const candidates = files.filter((filePath) => {
+			const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
+			return normalSlot.keywords.some((kw) => filename.includes(kw));
+		});
+
+		if (candidates.length === 0) return null;
+		if (candidates.length === 1) return candidates[0];
+
+		// Multiple normal candidates — try to match by type
+		const typed = candidates.map((path) => ({
+			path,
+			type: detectNormalType(path.split(/[/\\]/).pop() ?? ""),
+		}));
+
+		// Preferred type: use the current control setting, or fall back to default setting
+		const preferred = currentNormalType ?? (fallbackNormalType === "directx" ? "directx" : "opengl");
+
+		// Look for an exact match for the preferred type
+		const exactMatch = typed.find((t) => t.type === preferred);
+		if (exactMatch) return exactMatch.path;
+
+		// If one is typed and one isn't, prefer the untyped one (it's likely the "default")
+		const untyped = typed.filter((t) => t.type === null);
+		if (untyped.length > 0) return untyped[0].path;
+
+		// Fall back to first alphabetically
+		candidates.sort();
+		return candidates[0];
+	}, []);
+
 	// Autofill: scan input directory for files matching each slot's keywords (parallel)
 	const handleAutofill = useCallback(async () => {
 		if (!inputDir) return;
@@ -203,12 +256,26 @@ export default function MaterialPreviewPanel() {
 			const loads: Promise<void>[] = [];
 			for (const slot of mapSlots) {
 				if (textures[slot.key].path) continue;
-				const match = files.find((filePath) => {
-					const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
-					return slot.keywords.some((kw) => filename.includes(kw));
-				});
-				if (match) {
-					loads.push(loadTexture(slot.key, match));
+
+				if (slot.key === "normal") {
+					// Smart normal detection
+					const match = findBestNormal(files, normalType, defaultNormalType);
+					if (match) {
+						// Also set the normalType control if we can detect the type from the filename
+						const detectedType = detectNormalType(match.split(/[/\\]/).pop() ?? "");
+						if (detectedType) {
+							setNormalType(detectedType);
+						}
+						loads.push(loadTexture("normal", match));
+					}
+				} else {
+					const match = files.find((filePath) => {
+						const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
+						return slot.keywords.some((kw) => filename.includes(kw));
+					});
+					if (match) {
+						loads.push(loadTexture(slot.key, match));
+					}
 				}
 			}
 			await Promise.all(loads);
@@ -216,7 +283,7 @@ export default function MaterialPreviewPanel() {
 			console.error("Autofill failed:", err);
 		}
 		setAutofilling(false);
-	}, [inputDir, textures, loadTexture]);
+	}, [inputDir, textures, loadTexture, normalType, defaultNormalType, findBestNormal]);
 
 	return (
 		<div className="flex flex-1 min-w-0">
@@ -262,7 +329,7 @@ export default function MaterialPreviewPanel() {
 								thumbnail={textures[slot.key].preview}
 								onFilePicked={(path) => loadTexture(slot.key, path)}
 								onClear={() => clearTexture(slot.key)}
-								loading={loadingSlot === slot.key}
+								loading={loadingSlots.has(slot.key)}
 								compact
 							/>
 						</div>

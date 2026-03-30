@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { useAppStore } from "@/stores/appStore";
+import { usePreviewStore } from "@/stores/previewStore";
+import type { PreviewSubmodule } from "@/stores/previewStore";
 import PageHeader from "@/components/ui/PageHeader";
 import HistorySidebar from "@/components/HistorySidebar";
 import TilingPreviewPanel from "@/components/preview/TilingPreviewPanel";
 import MaterialPreviewPanel from "@/components/preview/MaterialPreviewPanel";
 import { LuGrid3X3, LuBox } from "react-icons/lu";
-
-type PreviewSubmodule = "2d" | "3d";
 
 const submodules: { id: PreviewSubmodule; label: string; description: string; icon: React.ReactNode }[] = [
 	{ id: "2d", label: "2D Preview", description: "Tile a texture in a grid to check seamlessness.", icon: <LuGrid3X3 size={15} /> },
@@ -14,7 +13,8 @@ const submodules: { id: PreviewSubmodule; label: string; description: string; ic
 ];
 
 export default function PreviewTools() {
-	const [activeSubmodule, setActiveSubmodule] = useState<PreviewSubmodule>("2d");
+	const activeSubmodule = usePreviewStore((s) => s.activeSubmodule);
+	const setActiveSubmodule = usePreviewStore((s) => s.setSubmodule);
 	const historySidebarOpen = useAppStore((s) => s.historySidebarOpen);
 
 	return (

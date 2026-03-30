@@ -33,12 +33,16 @@ async function buildCSS() {
 }
 
 async function buildMain() {
+	const pkg = await Bun.file("package.json").json();
 	await Bun.build({
 		entrypoints: ["src/main.tsx"],
 		outdir: DIST,
 		target: "browser",
 		naming: "[name].js",
-		define: { "process.env.NODE_ENV": '"development"' },
+		define: {
+			"process.env.NODE_ENV": '"development"',
+			"__APP_VERSION__": JSON.stringify(pkg.version),
+		},
 	});
 }
 
