@@ -250,6 +250,27 @@ pub fn save_image(
 	Ok(())
 }
 
+/// Save raw base64-encoded PNG data to a file in the requested format.
+/// Used for exporting viewport screenshots (2D/3D previews).
+#[tauri::command]
+pub async fn save_viewport(
+	data: String,
+	output_path: String,
+	format: String,
+) -> Result<(), String> {
+	tokio::task::spawn_blocking(move || {
+		use base64::Engine;
+		let bytes = base64::engine::general_purpose::STANDARD
+			.decode(&data)
+			.map_err(|e| format!("Invalid base64: {}", e))?;
+		let img = image::load_from_memory(&bytes)
+			.map_err(|e| format!("Failed to decode image: {}", e))?;
+		save_image(&img, &output_path, &format)
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DirEntry {
 	pub name: String,

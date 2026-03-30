@@ -38,7 +38,7 @@ export class PBRSceneManager {
 		this.camera.position.y = 1;
 
 		// Renderer
-		this.renderer = new THREE.WebGLRenderer({ antialias: true });
+		this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 		this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
 		this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 		container.appendChild(this.renderer.domElement);
@@ -119,6 +119,13 @@ export class PBRSceneManager {
 		this.camera.updateProjectionMatrix();
 		this.renderer.setSize(w, h);
 		this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+	}
+
+	/** Render one frame and capture the viewport as a base64 PNG (no data: prefix). */
+	captureViewport(): string {
+		this.renderer.render(this.scene, this.camera);
+		const dataUrl = this.renderer.domElement.toDataURL("image/png");
+		return dataUrl.replace(/^data:image\/png;base64,/, "");
 	}
 
 	dispose(): void {
