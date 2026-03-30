@@ -152,8 +152,8 @@ export default function MipChainPanel() {
 				</div>
 			</div>
 
-			{/* Mip cascade — single row, bottom-aligned */}
-			<div ref={containerRef} className="flex-1 overflow-hidden p-4 flex items-end">
+			{/* Mip cascade — single row, bottom-aligned relative to vertically centered first mip */}
+			<div ref={containerRef} className="flex-1 overflow-hidden p-4 flex items-center">
 				<div className="flex items-end" style={{ gap: GAP }}>
 					{mipLevels.map((lvl, i) => {
 						const displayW = Math.max(MIN_COL_WIDTH, Math.round(lvl.width * scale));
