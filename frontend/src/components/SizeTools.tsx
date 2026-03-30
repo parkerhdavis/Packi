@@ -34,7 +34,7 @@ export default function SizeTools() {
 
 			<div className="flex flex-1 min-h-0">
 				{/* Left sidebar */}
-				<div className="w-52 shrink-0 flex flex-col border-r border-base-300 bg-base-200/30">
+				<div className="w-64 shrink-0 flex flex-col border-r border-base-300 bg-base-200/30">
 					{/* Input */}
 					<div className="p-3 border-b border-base-300 shrink-0">
 						<label className="text-xs font-semibold text-base-content/50 mb-1 block">
