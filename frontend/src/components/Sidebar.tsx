@@ -4,6 +4,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useAdjustStore } from "@/stores/adjustStore";
 import { usePackStore } from "@/stores/packStore";
 import { usePreviewStore } from "@/stores/previewStore";
+import { useSizeStore } from "@/stores/sizeStore";
 import type { ModuleName } from "@/types";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -24,7 +25,7 @@ const modules: { id: ModuleName; label: string; tooltip: string; icon: React.Rea
 	{ id: "adjust", label: "Adjust", tooltip: "Image adjustments and normal map operations", icon: <LuCompass size={20} /> },
 	{ id: "pack", label: "Pack", tooltip: "Unpack, swizzle, and pack texture channels", icon: <LuLayers size={20} /> },
 	{ id: "preview", label: "Preview", tooltip: "2D tiling and 3D material preview", icon: <LuGrid3X3 size={20} /> },
-	{ id: "file-sizing", label: "File Sizing", tooltip: "Crop, resize, and recompress textures", icon: <LuFileBox size={20} /> },
+	{ id: "size", label: "Size", tooltip: "Texture analysis and VRAM budget estimation", icon: <LuFileBox size={20} /> },
 	{ id: "batch-processor", label: "Batch", tooltip: "Bulk format conversion, resize, and rename", icon: <LuFolderCog size={20} /> },
 ];
 
@@ -54,6 +55,7 @@ export default function Sidebar() {
 	const previewSubmodule = usePreviewStore((s) => s.activeSubmodule);
 	const tilingInputPath = usePreviewStore((s) => s.tilingInputPath);
 	const materialTexturePaths = usePreviewStore((s) => s.materialTexturePaths);
+	const sizeInputPath = useSizeStore((s) => s.inputPath);
 
 	const activeFilePaths = useMemo(() => {
 		const paths = new Set<string>();
@@ -92,9 +94,12 @@ export default function Sidebar() {
 						break;
 				}
 				break;
+			case "size":
+				add(sizeInputPath);
+				break;
 		}
 		return paths;
-	}, [activeModule, adjustInputPath, adjustBlendPath, packSubmodule, packUnpackPath, packSwizzlePath, packChannelR, packChannelG, packChannelB, packChannelA, previewSubmodule, tilingInputPath, materialTexturePaths]);
+	}, [activeModule, adjustInputPath, adjustBlendPath, packSubmodule, packUnpackPath, packSwizzlePath, packChannelR, packChannelG, packChannelB, packChannelA, previewSubmodule, tilingInputPath, materialTexturePaths, sizeInputPath]);
 
 	return (
 		<nav

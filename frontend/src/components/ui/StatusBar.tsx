@@ -6,7 +6,7 @@ const moduleLabels: Record<string, string> = {
 	pack: "Pack",
 	adjust: "Adjust",
 	preview: "Preview",
-	"file-sizing": "File Sizing",
+	size: "Size",
 	"batch-processor": "Batch Processor",
 	settings: "Settings",
 };

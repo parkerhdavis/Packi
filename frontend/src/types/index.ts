@@ -21,7 +21,7 @@ export type ModuleName =
 	| "pack"
 	| "adjust"
 	| "preview"
-	| "file-sizing"
+	| "size"
 	| "batch-processor"
 	| "settings";
 
