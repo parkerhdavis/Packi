@@ -10,12 +10,14 @@ export default function TilingPreviewPanel() {
 	const [inputPreview, setInputPreview] = useState<string | null>(null);
 	const [inputInfo, setInputInfo] = useState<ImageInfo | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [imageVersion, setImageVersion] = useState(0);
 
 	const [gridSize, setGridSize] = useState(3);
 	const [tilingMode, setTilingMode] = useState<TilingMode>("repeat");
 	const [offsetX, setOffsetX] = useState(false);
 	const [offsetY, setOffsetY] = useState(false);
 	const [showSeams, setShowSeams] = useState(false);
+	const [seamColor, setSeamColor] = useState("#ff0000");
 
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +51,7 @@ export default function TilingPreviewPanel() {
 		setInputPreview(null);
 		setInputInfo(null);
 		imageRef.current = null;
+		setImageVersion((v) => v + 1);
 	}, []);
 
 	// Load image element when preview changes
@@ -60,8 +63,9 @@ export default function TilingPreviewPanel() {
 		const img = new Image();
 		img.onload = () => {
 			imageRef.current = img;
-			// Auto-fit on first load
 			setFitMode(true);
+			// Bump version to trigger redraw since imageRef is not reactive
+			setImageVersion((v) => v + 1);
 		};
 		img.src = inputPreview.startsWith("data:") ? inputPreview : `data:image/png;base64,${inputPreview}`;
 	}, [inputPreview]);
@@ -116,21 +120,22 @@ export default function TilingPreviewPanel() {
 			}
 		}
 
-		// Draw seam lines
+		// Draw seam lines — scale line width so seams are visible at any zoom
 		if (showSeams) {
-			ctx.strokeStyle = "rgba(255, 0, 0, 0.6)";
-			ctx.lineWidth = 1;
-			ctx.setLineDash([4, 4]);
+			const lineW = Math.max(2, Math.round(tileW / 200));
+			ctx.strokeStyle = seamColor;
+			ctx.lineWidth = lineW;
+			ctx.setLineDash([lineW * 4, lineW * 4]);
 			for (let i = 1; i < gridSize; i++) {
 				// Vertical seams
 				ctx.beginPath();
-				ctx.moveTo(i * tileW + 0.5, 0);
-				ctx.lineTo(i * tileW + 0.5, totalH);
+				ctx.moveTo(i * tileW, 0);
+				ctx.lineTo(i * tileW, totalH);
 				ctx.stroke();
 				// Horizontal seams
 				ctx.beginPath();
-				ctx.moveTo(0, i * tileH + 0.5);
-				ctx.lineTo(totalW, i * tileH + 0.5);
+				ctx.moveTo(0, i * tileH);
+				ctx.lineTo(totalW, i * tileH);
 				ctx.stroke();
 			}
 			ctx.setLineDash([]);
@@ -147,7 +152,7 @@ export default function TilingPreviewPanel() {
 				y: (container.clientHeight - totalH * fitZoom) / 2,
 			});
 		}
-	}, [imageRef.current, gridSize, tilingMode, offsetX, offsetY, showSeams, fitMode]);
+	}, [imageVersion, gridSize, tilingMode, offsetX, offsetY, showSeams, seamColor, fitMode]);
 
 	// Wheel zoom
 	const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -219,7 +224,7 @@ export default function TilingPreviewPanel() {
 				{/* Tiling controls */}
 				<div className="p-3 space-y-3">
 					{/* Grid size */}
-					<div>
+					<div title="Number of times the texture repeats in each direction">
 						<label className="text-xs font-semibold text-base-content/50 mb-1 block">
 							Grid Size: {gridSize}x{gridSize}
 						</label>
@@ -239,7 +244,7 @@ export default function TilingPreviewPanel() {
 					</div>
 
 					{/* Tiling mode */}
-					<div>
+					<div title="Repeat tiles the texture identically. Mirror flips alternating tiles for seamless patterns.">
 						<label className="text-xs font-semibold text-base-content/50 mb-1 block">
 							Tiling Mode
 						</label>
@@ -259,7 +264,10 @@ export default function TilingPreviewPanel() {
 							Half-Tile Offset
 						</label>
 						<div className="space-y-1.5">
-							<label className="flex items-center gap-2 cursor-pointer">
+							<label
+								className="flex items-center gap-2 cursor-pointer"
+								title="Shift alternating rows by half a tile width, like a brick wall pattern"
+							>
 								<input
 									type="checkbox"
 									checked={offsetX}
@@ -268,7 +276,10 @@ export default function TilingPreviewPanel() {
 								/>
 								<span className="text-xs text-base-content/60">Offset X (brick pattern)</span>
 							</label>
-							<label className="flex items-center gap-2 cursor-pointer">
+							<label
+								className="flex items-center gap-2 cursor-pointer"
+								title="Shift alternating columns by half a tile height"
+							>
 								<input
 									type="checkbox"
 									checked={offsetY}
@@ -280,17 +291,37 @@ export default function TilingPreviewPanel() {
 						</div>
 					</div>
 
-					{/* Seam highlight */}
+					{/* Other */}
 					<div>
-						<label className="flex items-center gap-2 cursor-pointer">
-							<input
-								type="checkbox"
-								checked={showSeams}
-								onChange={(e) => setShowSeams(e.target.checked)}
-								className="checkbox checkbox-xs checkbox-primary"
-							/>
-							<span className="text-xs text-base-content/60">Show seam lines</span>
+						<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
+							Other
 						</label>
+						<div className="space-y-1.5">
+							<label
+								className="flex items-center gap-2 cursor-pointer"
+								title="Draw dashed lines at tile boundaries to highlight where seams occur"
+							>
+								<input
+									type="checkbox"
+									checked={showSeams}
+									onChange={(e) => setShowSeams(e.target.checked)}
+									className="checkbox checkbox-xs checkbox-primary"
+								/>
+								<span className="text-xs text-base-content/60">Show seam lines</span>
+							</label>
+							{showSeams && (
+								<div className="flex items-center gap-2 pl-6">
+									<input
+										type="color"
+										value={seamColor}
+										onChange={(e) => setSeamColor(e.target.value)}
+										className="w-6 h-6 rounded cursor-pointer border border-base-300"
+										title="Seam line color"
+									/>
+									<span className="text-xs text-base-content/40">Line color</span>
+								</div>
+							)}
+						</div>
 					</div>
 				</div>
 			</div>
