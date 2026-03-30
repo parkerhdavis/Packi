@@ -18,6 +18,8 @@ interface CurveEditorProps {
 	width?: number;
 	/** Height of the visible curve area in CSS pixels. */
 	height?: number;
+	/** Base64 image data for rendering a luminance histogram behind the curve. */
+	histogramImageData?: string | null;
 }
 
 // Internal padding (in canvas pixels) so endpoint handles don't sit at the
@@ -75,9 +77,11 @@ export default function CurveEditor({
 	onChange,
 	width = 220,
 	height = 220,
+	histogramImageData,
 }: CurveEditorProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const splinerRef = useRef<InstanceType<typeof CanvasSpliner> | null>(null);
+	const histogramBinsRef = useRef<Uint32Array | null>(null);
 
 	// Actual canvas dimensions include padding on each side
 	const canvasW = width + 2 * PAD;
@@ -122,6 +126,46 @@ export default function CurveEditor({
 			spliner._ctx.font = `${textSize}px courier`;
 			spliner._ctx.fillText(`x: ${x}`, (PAD + 6) / spliner._screenRatio, (PAD + 14) / spliner._screenRatio);
 			spliner._ctx.fillText(`y: ${y}`, (PAD + 6) / spliner._screenRatio, (PAD + 28) / spliner._screenRatio);
+		};
+
+		// Override draw to inject histogram between background and grid/curve
+		const origFillBackground = spliner._fillBackground.bind(spliner);
+		const origDrawGrid = spliner._drawGrid.bind(spliner);
+		const origDrawData = spliner._drawData.bind(spliner);
+
+		spliner.draw = () => {
+			spliner._ctx.clearRect(0, 0, canvasW, canvasH);
+			origFillBackground();
+
+			// Draw histogram bars behind grid and curve
+			const bins = histogramBinsRef.current;
+			if (bins) {
+				const ctx = spliner._ctx;
+				const ratio = spliner._screenRatio;
+				const innerW = canvasW - 2 * PAD;
+				const innerH = canvasH - 2 * PAD;
+				const barW = innerW / 256;
+
+				// Find max for normalization (skip extremes which often spike)
+				let max = 0;
+				for (let i = 1; i < 255; i++) {
+					if (bins[i] > max) max = bins[i];
+				}
+				max = Math.max(max, 1);
+				const capMax = max * 2;
+
+				ctx.fillStyle = "rgba(255, 255, 255, 0.07)";
+				for (let i = 1; i < 255; i++) {
+					const val = Math.min(bins[i], capMax);
+					const barH = (val / capMax) * innerH;
+					const x = (PAD + i * barW) / ratio;
+					const y = (PAD + innerH - barH) / ratio;
+					ctx.fillRect(x, y, Math.max(barW / ratio, 1), barH / ratio);
+				}
+			}
+
+			origDrawGrid();
+			origDrawData();
 		};
 
 		// Position canvas so the padded area extends beyond the container
@@ -223,6 +267,36 @@ export default function CurveEditor({
 			container.innerHTML = "";
 		};
 	}, [canvasW, canvasH]); // Intentionally exclude points/emitChange to avoid re-creating on every change
+
+	// Compute histogram bins when image data changes
+	useEffect(() => {
+		if (!histogramImageData) {
+			histogramBinsRef.current = null;
+			splinerRef.current?.draw();
+			return;
+		}
+
+		const img = new Image();
+		img.onload = () => {
+			const offscreen = document.createElement("canvas");
+			offscreen.width = img.naturalWidth;
+			offscreen.height = img.naturalHeight;
+			const ctx = offscreen.getContext("2d");
+			if (!ctx) return;
+			ctx.drawImage(img, 0, 0);
+
+			const pixels = ctx.getImageData(0, 0, offscreen.width, offscreen.height).data;
+			const bins = new Uint32Array(256);
+			for (let i = 0; i < pixels.length; i += 4) {
+				const lum = Math.round(0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]);
+				bins[lum]++;
+			}
+
+			histogramBinsRef.current = bins;
+			splinerRef.current?.draw();
+		};
+		img.src = `data:image/png;base64,${histogramImageData}`;
+	}, [histogramImageData]);
 
 	// Keep emitChange callback fresh without recreating the spliner
 	useEffect(() => {

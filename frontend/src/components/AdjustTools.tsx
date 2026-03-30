@@ -9,7 +9,6 @@ import ExportPanel from "@/components/ui/ExportPanel";
 import DropZone from "@/components/ui/DropZone";
 import CurveEditor from "@/components/ui/CurveEditor";
 import type { CurvePoint } from "@/components/ui/CurveEditor";
-import LuminanceHistogram from "@/components/ui/LuminanceHistogram";
 import HistorySidebar from "@/components/HistorySidebar";
 import type { ExportConfig } from "@/types";
 import {
@@ -124,50 +123,10 @@ export default function AdjustTools() {
 			/>
 
 			<div className="flex flex-1 min-h-0">
-				{/* Interior sidebar — section/function nav */}
-				<div className="w-52 shrink-0 flex flex-col border-r border-base-300 overflow-y-auto bg-base-200/30">
-					{sections.map((section) => (
-						<div key={section.id}>
-							<div className="px-3 pt-3 pb-1">
-								<div className="text-xs font-semibold text-base-content/50 uppercase tracking-wider">
-									{section.label}
-								</div>
-								<div className="text-xs text-base-content/30 mt-0.5 leading-snug">
-									{section.description}
-								</div>
-							</div>
-							<div className="flex flex-col gap-0.5 px-1.5 pb-2">
-								{section.operations.map((opId) => {
-									const op = operationMeta[opId];
-									const edited = isOperationEdited(opId);
-									return (
-										<button
-											key={opId}
-											type="button"
-											onClick={() => setOperation(opId)}
-											className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded text-left cursor-pointer transition-colors text-sm ${
-												activeOperation === opId
-													? "text-primary bg-primary/10 font-medium"
-													: "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
-											}`}
-										>
-											<span className="shrink-0 opacity-70">{op.icon}</span>
-											<span className="flex-1">{op.label}</span>
-											{edited && (
-												<span className="size-1.5 rounded-full bg-primary shrink-0" />
-											)}
-										</button>
-									);
-								})}
-							</div>
-						</div>
-					))}
-				</div>
-
-				{/* Controls panel */}
-				<div className="w-72 shrink-0 flex flex-col border-r border-base-300 overflow-y-auto">
-					{/* Module-level input */}
-					<div className="p-3 border-b border-base-300">
+				{/* Left control area — input bar, submodules+functions, export bar */}
+				<div className="flex flex-col shrink-0 border-r border-base-300" style={{ width: "calc(13rem + 18rem)" }}>
+					{/* Input bar — spans both columns */}
+					<div className="p-3 border-b border-base-300 shrink-0">
 						<label className="text-xs font-semibold text-base-content/50 mb-1 block">
 							Input Image
 						</label>
@@ -182,199 +141,233 @@ export default function AdjustTools() {
 						/>
 					</div>
 
-					{/* Function header + reset */}
-					<div className="flex items-start gap-2 px-3 pt-3 pb-2 border-b border-base-300">
-						<div className="flex-1 min-w-0">
-							<div className="text-sm font-semibold text-base-content">
-								{meta.label}
+					{/* Submodules + Functions columns */}
+					<div className="flex flex-1 min-h-0">
+						{/* Submodules column */}
+						<div className="w-52 shrink-0 flex flex-col border-r border-base-300 overflow-y-auto bg-base-200/30">
+							{sections.map((section) => (
+								<div key={section.id}>
+									<div className="px-3 pt-3 pb-1">
+										<div className="text-xs font-semibold text-base-content/50 uppercase tracking-wider">
+											{section.label}
+										</div>
+										<div className="text-xs text-base-content/30 mt-0.5 leading-snug">
+											{section.description}
+										</div>
+									</div>
+									<div className="flex flex-col gap-0.5 px-1.5 pb-2">
+										{section.operations.map((opId) => {
+											const op = operationMeta[opId];
+											const edited = isOperationEdited(opId);
+											return (
+												<button
+													key={opId}
+													type="button"
+													onClick={() => setOperation(opId)}
+													className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded text-left cursor-pointer transition-colors text-sm ${
+														activeOperation === opId
+															? "text-primary bg-primary/10 font-medium"
+															: "text-base-content/60 hover:text-base-content hover:bg-base-300/50"
+													}`}
+												>
+													<span className="shrink-0 opacity-70">{op.icon}</span>
+													<span className="flex-1">{op.label}</span>
+													{edited && (
+														<span className="size-1.5 rounded-full bg-primary shrink-0" />
+													)}
+												</button>
+											);
+										})}
+									</div>
+								</div>
+							))}
+						</div>
+
+						{/* Functions column */}
+						<div className="flex-1 flex flex-col overflow-y-auto">
+							{/* Function header + reset */}
+							<div className="flex items-start gap-2 px-3 pt-3 pb-2 border-b border-base-300 shrink-0">
+								<div className="flex-1 min-w-0">
+									<div className="text-sm font-semibold text-base-content">
+										{meta.label}
+									</div>
+									<div className="text-xs text-base-content/40 mt-0.5 leading-snug">
+										{meta.description}
+									</div>
+								</div>
+								{isOperationEdited(activeOperation) && (
+									<button
+										type="button"
+										onClick={() => resetOperation(activeOperation)}
+										className="btn btn-ghost btn-xs h-6 min-h-0 px-1.5 shrink-0 mt-0.5"
+										title="Reset to default"
+									>
+										<LuRotateCcw size={12} />
+									</button>
+								)}
 							</div>
-							<div className="text-xs text-base-content/40 mt-0.5 leading-snug">
-								{meta.description}
+
+							<div className="p-3 space-y-3">
+								{activeOperation === "luminance-curve" && (
+									<div>
+										<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
+											Curve
+										</label>
+										<CurveEditor
+											key={curveParams.curvePoints ? JSON.stringify(curveParams.curvePoints) : "default"}
+											points={curveParams.curvePoints ?? undefined}
+											width={240}
+											height={240}
+											onChange={handleCurveChange}
+											histogramImageData={resultPreview ?? inputPreview}
+										/>
+										<div className="flex justify-between text-xs text-base-content/30 mt-1">
+											<span>Shadows</span>
+											<span>Highlights</span>
+										</div>
+									</div>
+								)}
+
+								{activeOperation === "adjust-hue" && (
+									<div>
+										<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+											Hue Offset: {operationParams["adjust-hue"].hueOffset > 0 ? "+" : ""}{operationParams["adjust-hue"].hueOffset.toFixed(0)}°
+										</label>
+										<input
+											type="range"
+											min="-180"
+											max="180"
+											step="1"
+											value={operationParams["adjust-hue"].hueOffset}
+											onChange={(e) => updateParams("adjust-hue", { hueOffset: Number.parseFloat(e.target.value) })}
+											className="range range-primary range-xs w-full"
+										/>
+										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
+											<span>-180°</span>
+											<span>0°</span>
+											<span>+180°</span>
+										</div>
+									</div>
+								)}
+
+								{activeOperation === "adjust-saturation" && (
+									<div>
+										<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+											Saturation: {operationParams["adjust-saturation"].saturationOffset > 0 ? "+" : ""}{operationParams["adjust-saturation"].saturationOffset.toFixed(2)}
+										</label>
+										<input
+											type="range"
+											min="-1"
+											max="1"
+											step="0.01"
+											value={operationParams["adjust-saturation"].saturationOffset}
+											onChange={(e) => updateParams("adjust-saturation", { saturationOffset: Number.parseFloat(e.target.value) })}
+											className="range range-primary range-xs w-full"
+										/>
+										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
+											<span>Desaturate</span>
+											<span>Normal</span>
+											<span>Saturate</span>
+										</div>
+									</div>
+								)}
+
+								{activeOperation === "flip" && (
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-semibold text-base-content/50">
+											Enable Flip Green
+										</label>
+										<input
+											type="checkbox"
+											className="toggle toggle-primary toggle-sm"
+											checked={operationParams.flip.enabled}
+											onChange={(e) => updateParams("flip", { enabled: e.target.checked })}
+										/>
+									</div>
+								)}
+
+								{activeOperation === "height-to-normal" && (
+									<div>
+										<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+											Strength: {operationParams["height-to-normal"].strength.toFixed(1)}
+										</label>
+										<input
+											type="range"
+											min="0.1"
+											max="10"
+											step="0.1"
+											value={operationParams["height-to-normal"].strength}
+											onChange={(e) => updateParams("height-to-normal", { strength: Number.parseFloat(e.target.value) })}
+											className="range range-primary range-xs w-full"
+										/>
+										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
+											<span>0.1</span>
+											<span>10.0</span>
+										</div>
+									</div>
+								)}
+
+								{activeOperation === "blend" && (
+									<>
+										<div>
+											<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+												Normal Map B
+											</label>
+											<DropZone
+												label="Drop second normal map"
+												filePath={operationParams.blend.secondInputPath}
+												thumbnail={operationParams.blend.secondInputPreview}
+												onFilePicked={async (path) => {
+													const preview = await import("@tauri-apps/api/core").then(
+														(m) => m.invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 }),
+													);
+													updateParams("blend", { secondInputPath: path, secondInputPreview: preview });
+												}}
+												onClear={() => updateParams("blend", { secondInputPath: null, secondInputPreview: null })}
+												loading={false}
+												compact
+											/>
+										</div>
+										<div>
+											<label className="text-xs font-semibold text-base-content/50 mb-1 block">
+												Blend Factor: {operationParams.blend.blendFactor.toFixed(2)}
+										</label>
+										<input
+											type="range"
+											min="0"
+											max="1"
+											step="0.01"
+											value={operationParams.blend.blendFactor}
+											onChange={(e) => updateParams("blend", { blendFactor: Number.parseFloat(e.target.value) })}
+											className="range range-primary range-xs w-full"
+										/>
+										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
+											<span>A only</span>
+											<span>Full blend</span>
+										</div>
+									</div>
+									</>
+								)}
+
+								{activeOperation === "normalize" && (
+									<div className="flex items-center justify-between">
+										<label className="text-xs font-semibold text-base-content/50">
+											Enable Normalize
+										</label>
+										<input
+											type="checkbox"
+											className="toggle toggle-primary toggle-sm"
+											checked={operationParams.normalize.enabled}
+											onChange={(e) => updateParams("normalize", { enabled: e.target.checked })}
+										/>
+									</div>
+								)}
 							</div>
 						</div>
-						{isOperationEdited(activeOperation) && (
-							<button
-								type="button"
-								onClick={() => resetOperation(activeOperation)}
-								className="btn btn-ghost btn-xs h-6 min-h-0 px-1.5 shrink-0 mt-0.5"
-								title="Reset to default"
-							>
-								<LuRotateCcw size={12} />
-							</button>
-						)}
 					</div>
 
-					<div className="p-3 space-y-3">
-						{/* Operation-specific controls */}
-						{activeOperation === "luminance-curve" && (
-							<>
-								<div>
-									<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
-										Curve
-									</label>
-									<CurveEditor
-										key={curveParams.curvePoints ? JSON.stringify(curveParams.curvePoints) : "default"}
-										points={curveParams.curvePoints ?? undefined}
-										width={240}
-										height={240}
-										onChange={handleCurveChange}
-									/>
-									<div className="flex justify-between text-xs text-base-content/30 mt-1">
-										<span>Shadows</span>
-										<span>Highlights</span>
-									</div>
-								</div>
-								<div>
-									<label className="text-xs font-semibold text-base-content/50 mb-1.5 block">
-										Histogram
-									</label>
-									<LuminanceHistogram
-										imageData={resultPreview ?? inputPreview}
-										width={240}
-										height={240}
-									/>
-								</div>
-							</>
-						)}
-
-						{activeOperation === "adjust-hue" && (
-							<div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Hue Offset: {operationParams["adjust-hue"].hueOffset > 0 ? "+" : ""}{operationParams["adjust-hue"].hueOffset.toFixed(0)}°
-								</label>
-								<input
-									type="range"
-									min="-180"
-									max="180"
-									step="1"
-									value={operationParams["adjust-hue"].hueOffset}
-									onChange={(e) => updateParams("adjust-hue", { hueOffset: Number.parseFloat(e.target.value) })}
-									className="range range-primary range-xs w-full"
-								/>
-								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-									<span>-180°</span>
-									<span>0°</span>
-									<span>+180°</span>
-								</div>
-							</div>
-						)}
-
-						{activeOperation === "adjust-saturation" && (
-							<div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Saturation: {operationParams["adjust-saturation"].saturationOffset > 0 ? "+" : ""}{operationParams["adjust-saturation"].saturationOffset.toFixed(2)}
-								</label>
-								<input
-									type="range"
-									min="-1"
-									max="1"
-									step="0.01"
-									value={operationParams["adjust-saturation"].saturationOffset}
-									onChange={(e) => updateParams("adjust-saturation", { saturationOffset: Number.parseFloat(e.target.value) })}
-									className="range range-primary range-xs w-full"
-								/>
-								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-									<span>Desaturate</span>
-									<span>Normal</span>
-									<span>Saturate</span>
-								</div>
-							</div>
-						)}
-
-						{activeOperation === "flip" && (
-							<div className="flex items-center justify-between">
-								<label className="text-xs font-semibold text-base-content/50">
-									Enable Flip Green
-								</label>
-								<input
-									type="checkbox"
-									className="toggle toggle-primary toggle-sm"
-									checked={operationParams.flip.enabled}
-									onChange={(e) => updateParams("flip", { enabled: e.target.checked })}
-								/>
-							</div>
-						)}
-
-						{activeOperation === "height-to-normal" && (
-							<div>
-								<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-									Strength: {operationParams["height-to-normal"].strength.toFixed(1)}
-								</label>
-								<input
-									type="range"
-									min="0.1"
-									max="10"
-									step="0.1"
-									value={operationParams["height-to-normal"].strength}
-									onChange={(e) => updateParams("height-to-normal", { strength: Number.parseFloat(e.target.value) })}
-									className="range range-primary range-xs w-full"
-								/>
-								<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-									<span>0.1</span>
-									<span>10.0</span>
-								</div>
-							</div>
-						)}
-
-						{activeOperation === "blend" && (
-							<>
-								<div>
-									<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-										Normal Map B
-									</label>
-									<DropZone
-										label="Drop second normal map"
-										filePath={operationParams.blend.secondInputPath}
-										thumbnail={operationParams.blend.secondInputPreview}
-										onFilePicked={async (path) => {
-											const preview = await import("@tauri-apps/api/core").then(
-												(m) => m.invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 }),
-											);
-											updateParams("blend", { secondInputPath: path, secondInputPreview: preview });
-										}}
-										onClear={() => updateParams("blend", { secondInputPath: null, secondInputPreview: null })}
-										loading={false}
-										compact
-									/>
-								</div>
-								<div>
-									<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-										Blend Factor: {operationParams.blend.blendFactor.toFixed(2)}
-									</label>
-									<input
-										type="range"
-										min="0"
-										max="1"
-										step="0.01"
-										value={operationParams.blend.blendFactor}
-										onChange={(e) => updateParams("blend", { blendFactor: Number.parseFloat(e.target.value) })}
-										className="range range-primary range-xs w-full"
-									/>
-									<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-										<span>A only</span>
-										<span>Full blend</span>
-									</div>
-								</div>
-							</>
-						)}
-
-						{activeOperation === "normalize" && (
-							<div className="flex items-center justify-between">
-								<label className="text-xs font-semibold text-base-content/50">
-									Enable Normalize
-								</label>
-								<input
-									type="checkbox"
-									className="toggle toggle-primary toggle-sm"
-									checked={operationParams.normalize.enabled}
-									onChange={(e) => updateParams("normalize", { enabled: e.target.checked })}
-								/>
-							</div>
-						)}
-					</div>
-
-					{/* Export panel */}
-					<div className="mt-auto p-3">
+					{/* Export bar — spans both columns */}
+					<div className="border-t border-base-300 p-3 shrink-0">
 						<ExportPanel
 							formats={["png8", "png16", "tga"]}
 							defaultFormat="png8"
