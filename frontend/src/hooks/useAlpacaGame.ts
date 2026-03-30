@@ -6,8 +6,8 @@ const JUMP_VELOCITY = -600;
 const GROUND_FRICTION = 0.75;
 const SPRITE_SIZE = 120; // size-30 = 7.5rem = 120px
 const BACKFLIP_SPEED = 480; // degrees/sec
-const WOBBLE_FREQ = 14; // oscillations/sec
-const WOBBLE_AMPLITUDE = 15; // degrees
+const WOBBLE_FREQ = 3; // oscillations/sec
+const WOBBLE_AMPLITUDE = 12; // degrees
 
 interface Position {
 	x: number;
@@ -110,8 +110,8 @@ export default function useAlpacaGame() {
 		// Rotation: backflip or wobble
 		let rot = 0;
 		if (s.backflipping) {
-			s.backflipAngle += BACKFLIP_SPEED * dt;
-			if (s.backflipAngle >= 360) {
+			s.backflipAngle -= BACKFLIP_SPEED * dt;
+			if (s.backflipAngle <= -360) {
 				s.backflipAngle = 0;
 				s.backflipping = false;
 			}
