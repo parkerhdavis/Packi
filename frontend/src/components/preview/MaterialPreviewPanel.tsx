@@ -67,7 +67,7 @@ export default function MaterialPreviewPanel() {
 	const [displacementScale, setDisplacementScale] = useState(0.01);
 	const [tilingScale, setTilingScale] = useState(1.0);
 	const [clayRender, setClayRender] = useState(false);
-	const [environment, setEnvironment] = useState("studio");
+	const [environment, setEnvironment] = useState("field");
 
 	// Loading states
 	const [loadingSlot, setLoadingSlot] = useState<MapKey | null>(null);

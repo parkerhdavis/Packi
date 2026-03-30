@@ -1,5 +1,8 @@
+import { useMemo } from "react";
 import { useAppStore } from "@/stores/appStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useAdjustStore } from "@/stores/adjustStore";
+import { usePackStore } from "@/stores/packStore";
 import type { ModuleName } from "@/types";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -36,6 +39,37 @@ export default function Sidebar() {
 	const save = useSettingsStore((s) => s.save);
 
 	const splashIcon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
+
+	// Collect active input file paths from the current module's store
+	const adjustInputPath = useAdjustStore((s) => s.inputPath);
+	const adjustBlendPath = useAdjustStore((s) => s.operationParams.blend.secondInputPath);
+	const packUnpackPath = usePackStore((s) => s.unpackInputPath);
+	const packSwizzlePath = usePackStore((s) => s.swizzleInputPath);
+	const packChannelR = usePackStore((s) => s.packChannels.r?.filePath ?? null);
+	const packChannelG = usePackStore((s) => s.packChannels.g?.filePath ?? null);
+	const packChannelB = usePackStore((s) => s.packChannels.b?.filePath ?? null);
+	const packChannelA = usePackStore((s) => s.packChannels.a?.filePath ?? null);
+
+	const activeFilePaths = useMemo(() => {
+		const paths = new Set<string>();
+		const add = (p: string | null) => { if (p) paths.add(p); };
+
+		switch (activeModule) {
+			case "adjust":
+				add(adjustInputPath);
+				add(adjustBlendPath);
+				break;
+			case "pack":
+				add(packUnpackPath);
+				add(packSwizzlePath);
+				add(packChannelR);
+				add(packChannelG);
+				add(packChannelB);
+				add(packChannelA);
+				break;
+		}
+		return paths;
+	}, [activeModule, adjustInputPath, adjustBlendPath, packUnpackPath, packSwizzlePath, packChannelR, packChannelG, packChannelB, packChannelA]);
 
 	return (
 		<nav
@@ -142,6 +176,7 @@ export default function Sidebar() {
 							directory={inputDir ?? null}
 							onSetDirectory={(path) => save({ input_dir: path })}
 							onClearDirectory={() => save({ input_dir: null })}
+							activeFilePaths={activeFilePaths}
 						/>
 					</div>
 					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">

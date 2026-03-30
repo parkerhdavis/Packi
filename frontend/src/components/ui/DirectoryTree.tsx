@@ -18,6 +18,8 @@ interface DirectoryTreeProps {
 	directory: string | null;
 	onSetDirectory: (path: string) => void;
 	onClearDirectory: () => void;
+	/** Set of file paths currently used as inputs in the active module. */
+	activeFilePaths?: Set<string>;
 }
 
 interface TreeNodeState {
@@ -31,6 +33,7 @@ export default function DirectoryTree({
 	directory,
 	onSetDirectory,
 	onClearDirectory,
+	activeFilePaths,
 }: DirectoryTreeProps) {
 	const [treeState, setTreeState] = useState<Record<string, TreeNodeState>>({});
 
@@ -141,6 +144,7 @@ export default function DirectoryTree({
 						depth={0}
 						treeState={treeState}
 						onToggle={toggleFolder}
+						activeFilePaths={activeFilePaths}
 					/>
 				))}
 				{rootEntries.length === 0 && (
@@ -158,15 +162,18 @@ function TreeNode({
 	depth,
 	treeState,
 	onToggle,
+	activeFilePaths,
 }: {
 	entry: DirEntry;
 	depth: number;
 	treeState: Record<string, TreeNodeState>;
 	onToggle: (path: string) => void;
+	activeFilePaths?: Set<string>;
 }) {
 	const state = treeState[entry.path];
 	const isExpanded = state?.expanded ?? false;
 	const children = state?.children ?? [];
+	const isActive = !entry.is_dir && activeFilePaths?.has(entry.path);
 
 	if (entry.is_dir) {
 		return (
@@ -197,6 +204,7 @@ function TreeNode({
 							depth={depth + 1}
 							treeState={treeState}
 							onToggle={onToggle}
+							activeFilePaths={activeFilePaths}
 						/>
 					))}
 			</div>
@@ -210,12 +218,17 @@ function TreeNode({
 				e.dataTransfer.setData("application/packi-filepath", entry.path);
 				e.dataTransfer.effectAllowed = "copy";
 			}}
-			className="flex items-center gap-1 px-1 py-0.5 rounded text-xs hover:bg-base-300/50 cursor-grab active:cursor-grabbing"
+			className={`flex items-center gap-1 px-1 py-0.5 rounded text-xs select-none cursor-grab active:cursor-grabbing ${
+				isActive
+					? "text-primary bg-primary/10"
+					: "hover:bg-base-300/50"
+			}`}
 			style={{ paddingLeft: `${depth * 12 + 20}px` }}
 			title={entry.path}
 		>
-			<LuImage size={12} className="text-base-content/40 shrink-0" />
+			<LuImage size={12} className={`shrink-0 ${isActive ? "text-primary/70" : "text-base-content/40"}`} />
 			<span className="truncate">{entry.name}</span>
+			{isActive && <span className="size-1.5 rounded-full bg-primary shrink-0 ml-auto" />}
 		</div>
 	);
 }
