@@ -3,6 +3,7 @@ import { useAppStore } from "@/stores/appStore";
 import PageHeader from "@/components/ui/PageHeader";
 import HistorySidebar from "@/components/HistorySidebar";
 import TilingPreviewPanel from "@/components/preview/TilingPreviewPanel";
+import MaterialPreviewPanel from "@/components/preview/MaterialPreviewPanel";
 import { LuGrid3X3, LuBox } from "react-icons/lu";
 
 type PreviewSubmodule = "2d" | "3d";
@@ -58,14 +59,7 @@ export default function PreviewTools() {
 				{/* Content area */}
 				<div className="flex-1 min-w-0 flex">
 					{activeSubmodule === "2d" && <TilingPreviewPanel />}
-					{activeSubmodule === "3d" && (
-						<div className="flex-1 flex items-center justify-center text-base-content/30">
-							<div className="text-center">
-								<p className="text-lg font-medium">Coming soon</p>
-								<p className="text-sm mt-1">3D material preview is under development.</p>
-							</div>
-						</div>
-					)}
+					{activeSubmodule === "3d" && <MaterialPreviewPanel />}
 				</div>
 
 				{/* History sidebar */}

@@ -1,0 +1,152 @@
+/* Base CSS */
+
+:root{
+	--error: #FF0000;
+	--success: #00FF00;
+	--warning: #FFFF00;
+	--info: #FFFFFF;
+}
+
+body{
+	box-sizing: border-box;
+	font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+}
+
+body, main{
+	margin: 0;
+	width: 100vw;
+	height: 100vh;
+	z-index: 0;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	background-color: black;
+}
+
+/* GUI elements */
+
+.nav-main-elements{
+	display: grid;
+	grid-template-columns: min-content auto;
+	width: 100%;
+	overflow: hidden;
+}
+
+nav {
+	height: 0;
+	display: block;
+	position: absolute;
+	top:0px;
+	left:20px;
+	z-index: 1;
+	background-color: #00000050;
+	color:#ffffff;
+	overflow: hidden;
+	border-bottom-right-radius: 10px;
+    border-bottom-left-radius: 10px;
+}
+
+nav input,
+nav select{
+	margin: 10px;
+}
+
+nav select{
+	border-radius: 3px;
+}
+
+nav label{
+	margin: 10px;
+	white-space: nowrap;
+}
+
+#gui_enable{
+	display:none;
+}
+
+#gui_enable_label{
+	width: 100%;
+    display: block;
+    text-align: center;
+    margin: 0px;
+	padding-bottom: 10px;
+	padding-top:10px;
+	font-size: 0.75em;
+}
+
+#gui_enable_label:hover{
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+#fullscreen-toggle{
+
+	/* Off by default, gets turned on by JS,
+	if fullscreen is actually available*/
+	display: none;
+
+	position:absolute;
+	font-family: monospace;
+	font-size: 1.5em;
+	top: 0px;
+	right: 5px;
+	color: #ffffff;
+	padding: 10px;
+	cursor: pointer;
+	background-color: transparent;
+	border: none;
+}
+
+
+/* Loading notes */
+
+.message-area{
+	position:absolute;
+	bottom: 0px;
+	left: 20px;
+	color: white;
+	pointer-events:none;
+	user-select:none;
+	font-family: monospace;
+	background-color: #00000050;
+	border-top-right-radius: 10px;
+    border-top-left-radius: 10px;
+	padding: 10px;
+}
+
+.message-area:empty{
+	display: none;
+}
+
+/* Watermark */
+
+.watermark{
+	position: absolute;
+	bottom: 10px;
+	right: 10px;
+}
+
+.watermark img{
+	mix-blend-mode: exclusion;
+	opacity: 50%;
+}
+
+.watermark-off{
+	display: none;
+}
+
+.watermark-small{
+	display: block;
+}
+
+.watermark-small img{
+	width: 40px;
+}
+
+.watermark-large{
+	display:block;
+}
+
+.watermark-large img{
+	width: 80px;
+}

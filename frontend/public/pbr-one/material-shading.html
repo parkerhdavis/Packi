@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<link rel="stylesheet" href="./css/main.css">
+		<title>PBR.ONE Material Preview</title>
+		<style>
+			/* Override PBR.ONE styles for embedded use */
+			body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1a1a2e; }
+			#renderer_target { width: 100%; height: 100%; position: relative; }
+			#renderer_target canvas { width: 100% !important; height: 100% !important; }
+			nav, .watermark, #fullscreen-toggle, .message-area { display: none !important; }
+		</style>
+	</head>
+	<body>
+		<main id="renderer_target">
+			<!-- Nav, watermark, and fullscreen stripped for Packi embedding -->
+			<nav style="display:none">
+				<div class="nav-main-elements"></div>
+				<label id="gui_enable_label" for="gui_enable"></label>
+				<input type="checkbox" id="gui_enable">
+			</nav>
+			<button id="fullscreen-toggle" style="display:none"></button>
+			<a class="watermark watermark-off" style="display:none"></a>
+			<span class="message-area" id="messageArea" style="display:none"></span>
+		</main>
+		<script type="module" src="./js/views/material-shading.js"></script>
+	</body>
+</html>
