@@ -1,3 +1,4 @@
+use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageReader};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
@@ -51,6 +52,60 @@ fn load_image_info_sync(path: &str) -> Result<ImageInfo, String> {
 		bit_depth,
 		file_size: metadata.len(),
 	})
+}
+
+/// Result of loading an image with its preview in a single decode pass.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageWithPreview {
+	pub info: ImageInfo,
+	pub preview: String,
+}
+
+/// Load image info and a base64 preview in a single decode, avoiding redundant I/O.
+#[tauri::command]
+pub async fn load_image_with_preview(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<ImageWithPreview, String> {
+	tokio::task::spawn_blocking(move || {
+		let file_path = Path::new(&path);
+		let metadata = std::fs::metadata(file_path)
+			.map_err(|e| format!("Failed to read file metadata: {}", e))?;
+
+		let reader = ImageReader::open(file_path)
+			.map_err(|e| format!("Failed to open image: {}", e))?
+			.with_guessed_format()
+			.map_err(|e| format!("Failed to detect format: {}", e))?;
+
+		let format = reader
+			.format()
+			.map(format_to_string)
+			.unwrap_or_else(|| "unknown".to_string());
+
+		let img = reader
+			.decode()
+			.map_err(|e| format!("Failed to decode image: {}", e))?;
+
+		let (width, height) = img.dimensions();
+		let channels = img.color().channel_count() as u32;
+		let bit_depth = (img.color().bytes_per_pixel() as u32 * 8) / channels;
+
+		let info = ImageInfo {
+			width,
+			height,
+			channels,
+			format,
+			bit_depth,
+			file_size: metadata.len(),
+		};
+
+		let preview_img = maybe_resize(img, max_preview_size);
+		let preview = encode_to_base64_png(&preview_img)?;
+
+		Ok(ImageWithPreview { info, preview })
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
 }
 
 #[tauri::command]
@@ -114,12 +169,14 @@ pub fn load_dynamic_image(path: &str) -> Result<DynamicImage, String> {
 		.map_err(|e| format!("Failed to decode image: {}", e))
 }
 
-/// Encode a DynamicImage to a base64 PNG string.
+/// Encode a DynamicImage to a base64 PNG string using fast compression.
 pub fn encode_to_base64_png(img: &DynamicImage) -> Result<String, String> {
 	use base64::Engine;
 
 	let mut buf = Vec::new();
-	img.write_to(&mut Cursor::new(&mut buf), ImageFormat::Png)
+	let cursor = Cursor::new(&mut buf);
+	let encoder = PngEncoder::new_with_quality(cursor, CompressionType::Fast, FilterType::Sub);
+	img.write_with_encoder(encoder)
 		.map_err(|e| format!("Failed to encode PNG: {}", e))?;
 
 	Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
@@ -130,7 +187,7 @@ pub fn maybe_resize(img: DynamicImage, max_size: Option<u32>) -> DynamicImage {
 	if let Some(max_size) = max_size {
 		let (w, h) = img.dimensions();
 		if w > max_size || h > max_size {
-			img.resize(max_size, max_size, image::imageops::FilterType::Lanczos3)
+			img.resize(max_size, max_size, image::imageops::FilterType::CatmullRom)
 		} else {
 			img
 		}

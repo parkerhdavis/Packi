@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import type { ImageInfo } from "@/types";
+import type { ImageInfo, ImageWithPreview } from "@/types";
 import type { CurvePoint } from "@/components/ui/CurveEditor";
 import { useUndoStore } from "@/stores/undoStore";
 
@@ -219,10 +219,8 @@ export const useAdjustStore = create<AdjustState>((set, get) => ({
 
 		set({ inputLoading: true });
 		try {
-			const [info, preview] = await Promise.all([
-				invoke<ImageInfo>("load_image_info", { path }),
-				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 }),
-			]);
+			const result = await invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 512 });
+			const { info, preview } = result;
 			set({
 				inputPath: path,
 				inputInfo: info,

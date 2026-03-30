@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import type { ImageInfo, ChannelSource } from "@/types";
+import type { ImageInfo, ImageWithPreview, ChannelSource } from "@/types";
 
 // --- Shared types ---
 
@@ -155,15 +155,14 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 	loadUnpackInput: async (path) => {
 		set({ unpackLoading: true });
 		try {
-			const [info, preview, channels] = await Promise.all([
-				invoke<ImageInfo>("load_image_info", { path }),
-				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 }),
+			const [result, channels] = await Promise.all([
+				invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 512 }),
 				invoke<UnpackChannelPreviews>("unpack_channels", { path, maxPreviewSize: 512 }),
 			]);
 			set({
 				unpackInputPath: path,
-				unpackInputInfo: info,
-				unpackInputPreview: preview,
+				unpackInputInfo: result.info,
+				unpackInputPreview: result.preview,
 				unpackChannelPreviews: channels,
 				unpackLoading: false,
 			});
@@ -207,14 +206,11 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 	loadSwizzleInput: async (path) => {
 		set({ swizzleInputLoading: true });
 		try {
-			const [info, preview] = await Promise.all([
-				invoke<ImageInfo>("load_image_info", { path }),
-				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 512 }),
-			]);
+			const result = await invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 512 });
 			set({
 				swizzleInputPath: path,
-				swizzleInputInfo: info,
-				swizzleInputPreview: preview,
+				swizzleInputInfo: result.info,
+				swizzleInputPreview: result.preview,
 				swizzleResultPreview: null,
 				swizzleInputLoading: false,
 			});
@@ -327,10 +323,7 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 			packLoadingChannels: { ...s.packLoadingChannels, [slot]: true },
 		}));
 		try {
-			const [info, thumbnail] = await Promise.all([
-				invoke<ImageInfo>("load_image_info", { path: filePath }),
-				invoke<string>("load_image_as_base64", { path: filePath, maxPreviewSize: 128 }),
-			]);
+			const result = await invoke<ImageWithPreview>("load_image_with_preview", { path: filePath, maxPreviewSize: 128 });
 
 			const { packPresetLabels } = get();
 			const invertKey = `${slot}_invert` as keyof PresetLabels;
@@ -343,8 +336,8 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 						filePath,
 						sourceChannel: "luminance" as ChannelSource,
 						invert: defaultInvert,
-						thumbnail,
-						info,
+						thumbnail: result.preview,
+						info: result.info,
 					},
 				},
 				packLoadingChannels: { ...s.packLoadingChannels, [slot]: false },

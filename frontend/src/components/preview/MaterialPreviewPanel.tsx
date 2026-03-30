@@ -5,7 +5,7 @@ import { usePreviewStore } from "@/stores/previewStore";
 import DropZone from "@/components/ui/DropZone";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { LuWand } from "react-icons/lu";
-import type { ImageInfo } from "@/types";
+import type { ImageInfo, ImageWithPreview } from "@/types";
 
 type GeometryType = "plane" | "cube" | "sphere" | "cylinder" | "torus";
 type NormalType = "opengl" | "directx";
@@ -173,16 +173,15 @@ export default function MaterialPreviewPanel() {
 	const loadTexture = useCallback(async (slot: MapKey, path: string) => {
 		setLoadingSlots((prev) => new Set(prev).add(slot));
 		try {
-			// Load thumbnail for the slot UI + full-res for the 3D preview
-			const [info, thumbnail, fullRes] = await Promise.all([
-				invoke<ImageInfo>("load_image_info", { path }),
-				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 128 }),
+			// Combined info+thumbnail in one decode, full-res preview in a second
+			const [result, fullRes] = await Promise.all([
+				invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 128 }),
 				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 2048 }),
 			]);
 
 			setTextures((prev) => ({
 				...prev,
-				[slot]: { path, preview: thumbnail, info },
+				[slot]: { path, preview: result.preview, info: result.info },
 			}));
 			setMaterialTexturePath(slot, path);
 
