@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSizeStore } from "@/stores/sizeStore";
 import TexturePreview from "@/components/ui/TexturePreview";
 import { GPU_FORMATS, computeTotalWithMips, formatBytes } from "@/components/size/vramFormats";
@@ -12,20 +12,44 @@ export default function VramBudgetPanel() {
 	const info = useSizeStore((s) => s.inputInfo);
 	const preview = useSizeStore((s) => s.inputPreview);
 	const [includeMips, setIncludeMips] = useState(true);
-	const [selectedIndex, setSelectedIndex] = useState(0);
-
-	// Build resolution steps: actual first, then standard sizes descending
-	const resolutionSteps = useMemo(() => {
-		if (!info) return [];
-		const steps: { label: string; width: number; height: number }[] = [
-			{ label: `${info.width}×${info.height} (actual)`, width: info.width, height: info.height },
-		];
-		for (const size of STANDARD_RESOLUTIONS) {
-			if (size === info.width && size === info.height) continue;
-			steps.push({ label: `${size}×${size}`, width: size, height: size });
+	// Build resolution steps: ascending order (32 → 16384), with actual inserted in sorted position
+	const { resolutionSteps, defaultIndex } = useMemo(() => {
+		if (!info) return { resolutionSteps: [] as { label: string; width: number; height: number; isActual: boolean }[], defaultIndex: 0 };
+		const ascending = [...STANDARD_RESOLUTIONS].reverse(); // 32, 64, ..., 16384
+		const steps: { label: string; width: number; height: number; isActual: boolean }[] = [];
+		const actualSize = Math.max(info.width, info.height);
+		let inserted = false;
+		let actualIndex = 0;
+		for (const size of ascending) {
+			if (!inserted && actualSize <= size) {
+				if (actualSize === size && info.width === info.height) {
+					// Actual matches this standard size exactly — mark it
+					steps.push({ label: `${size}×${size} (actual)`, width: info.width, height: info.height, isActual: true });
+					actualIndex = steps.length - 1;
+					inserted = true;
+					continue;
+				}
+				// Insert actual before this larger standard size
+				steps.push({ label: `${info.width}×${info.height} (actual)`, width: info.width, height: info.height, isActual: true });
+				actualIndex = steps.length - 1;
+				inserted = true;
+			}
+			steps.push({ label: `${size}×${size}`, width: size, height: size, isActual: false });
 		}
-		return steps;
+		if (!inserted) {
+			// Actual is larger than all standard sizes
+			steps.push({ label: `${info.width}×${info.height} (actual)`, width: info.width, height: info.height, isActual: true });
+			actualIndex = steps.length - 1;
+		}
+		return { resolutionSteps: steps, defaultIndex: actualIndex };
 	}, [info]);
+
+	const [selectedIndex, setSelectedIndex] = useState(defaultIndex);
+
+	// Reset slider to actual resolution when image changes
+	useEffect(() => {
+		setSelectedIndex(defaultIndex);
+	}, [defaultIndex]);
 
 	if (!info) {
 		return (
@@ -80,13 +104,13 @@ export default function VramBudgetPanel() {
 							className="range range-primary range-xs w-full"
 						/>
 						<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-							<span>Actual</span>
-							<span>32</span>
+							<span>{resolutionSteps[0]?.label.split(" ")[0]}</span>
+							<span>{resolutionSteps[resolutionSteps.length - 1]?.label.split(" ")[0]}</span>
 						</div>
 					</div>
 
 					<div className="text-xs text-base-content/40 mb-3">
-						Estimated GPU memory for a {width}×{height} texture{includeMips ? " with full mip chain" : ""}.
+						Estimated GPU memory for a {width}×{height} texture{includeMips ? " with mip chain" : ""}.
 					</div>
 				</div>
 
