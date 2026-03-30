@@ -19,7 +19,7 @@ import DirectoryTree from "@/components/ui/DirectoryTree";
 const modules: { id: ModuleName; label: string; tooltip: string; icon: React.ReactNode }[] = [
 	{ id: "adjust", label: "Adjust", tooltip: "Image adjustments and normal map operations", icon: <LuCompass size={20} /> },
 	{ id: "pack", label: "Pack", tooltip: "Unpack, swizzle, and pack texture channels", icon: <LuLayers size={20} /> },
-	{ id: "tiling", label: "Mesh and Tile", tooltip: "Seamless tiling preview and mesh tools", icon: <LuGrid3X3 size={20} /> },
+	{ id: "preview", label: "Preview", tooltip: "2D tiling and 3D material preview", icon: <LuGrid3X3 size={20} /> },
 	{ id: "file-sizing", label: "File Sizing", tooltip: "Crop, resize, and recompress textures", icon: <LuFileBox size={20} /> },
 	{ id: "batch-processor", label: "Batch", tooltip: "Bulk format conversion, resize, and rename", icon: <LuFolderCog size={20} /> },
 ];

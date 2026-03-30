@@ -5,7 +5,7 @@ import { LuSun, LuMoon, LuPlus, LuMinus } from "react-icons/lu";
 const moduleLabels: Record<string, string> = {
 	pack: "Pack",
 	adjust: "Adjust",
-	tiling: "Mesh and Tile",
+	preview: "Preview",
 	"file-sizing": "File Sizing",
 	"batch-processor": "Batch Processor",
 	settings: "Settings",

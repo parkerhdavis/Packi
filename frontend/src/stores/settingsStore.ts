@@ -33,6 +33,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 			// Migrate renamed modules
 			if (settings.last_module === "channel-packer") settings.last_module = "pack";
 			if (settings.last_module === "normal-tools") settings.last_module = "adjust";
+			if (settings.last_module === "tiling") settings.last_module = "preview";
 			applyTheme(settings.theme);
 			applyZoom(settings.zoom);
 			set({ settings, loaded: true });
