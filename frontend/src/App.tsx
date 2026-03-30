@@ -131,7 +131,7 @@ export default function App() {
 				<img
 					src={splashIcon}
 					alt="Packi"
-					className="size-40 animate-splash-icon"
+					className="size-40 animate-splash-icon translate-x-2"
 				/>
 				<span className="text-4xl font-bold tracking-tight animate-fade-in-up">
 					Packi
