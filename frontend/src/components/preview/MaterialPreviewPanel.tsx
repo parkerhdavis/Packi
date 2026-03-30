@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
+import { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePreviewStore } from "@/stores/previewStore";
@@ -77,24 +77,13 @@ const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPre
 
 	useImperativeHandle(ref, () => ({ captureViewport }), [captureViewport]);
 
-	// Revoke all Blob URLs on unmount
-	const textureUrlsRef = useRef(textureDataUrls);
-	textureUrlsRef.current = textureDataUrls;
-	useEffect(() => {
-		return () => {
-			for (const url of Object.values(textureUrlsRef.current)) {
-				if (url) URL.revokeObjectURL(url);
-			}
-		};
-	}, []);
-
 	// Load a texture into a slot
 	const loadTexture = useCallback(async (slot: MapKey, path: string) => {
 		setLoadingSlots((prev) => new Set(prev).add(slot));
 		try {
-			const [result, pngBytes] = await Promise.all([
+			const [result, fullRes] = await Promise.all([
 				invoke<ImageWithPreview>("load_image_with_preview", { path, maxPreviewSize: 128 }),
-				invoke<ArrayBuffer>("load_image_as_png_bytes", { path, maxPreviewSize: 2048 }),
+				invoke<string>("load_image_as_base64", { path, maxPreviewSize: 2048 }),
 			]);
 
 			setTextures((prev) => ({
@@ -103,14 +92,8 @@ const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPre
 			}));
 			setMaterialTexturePath(slot, path);
 
-			// Create a Blob URL from raw PNG bytes — no base64 overhead
-			const blob = new Blob([pngBytes], { type: "image/png" });
-			const blobUrl = URL.createObjectURL(blob);
-			setTextureDataUrls((prev) => {
-				// Revoke the old Blob URL to free memory
-				if (prev[slot]) URL.revokeObjectURL(prev[slot]);
-				return { ...prev, [slot]: blobUrl };
-			});
+			const dataUrl = `data:image/png;base64,${fullRes}`;
+			setTextureDataUrls((prev) => ({ ...prev, [slot]: dataUrl }));
 		} catch (err) {
 			console.error(`Failed to load texture for ${slot}:`, err);
 		}
@@ -125,11 +108,7 @@ const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPre
 	const clearTexture = useCallback((slot: MapKey) => {
 		setTextures((prev) => ({ ...prev, [slot]: { ...emptySlot } }));
 		setMaterialTexturePath(slot, null);
-		setTextureDataUrls((prev) => {
-			// Revoke the old Blob URL to free memory
-			if (prev[slot]) URL.revokeObjectURL(prev[slot]);
-			return { ...prev, [slot]: null };
-		});
+		setTextureDataUrls((prev) => ({ ...prev, [slot]: null }));
 	}, [setMaterialTexturePath]);
 
 	// Find the best normal map match for the current normalType setting
