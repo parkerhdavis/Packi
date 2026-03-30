@@ -24,6 +24,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 		sidebar_open: null,
 		input_dir: null,
 		output_dir: null,
+		default_normal_type: null,
 	},
 	loaded: false,
 

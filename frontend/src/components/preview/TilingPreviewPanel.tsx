@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { usePreviewStore } from "@/stores/previewStore";
 import DropZone from "@/components/ui/DropZone";
 import type { ImageInfo } from "@/types";
 
@@ -30,6 +31,8 @@ export default function TilingPreviewPanel() {
 	const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 	const [fitMode, setFitMode] = useState(true);
 
+	const setTilingInputPath = usePreviewStore((s) => s.setTilingInputPath);
+
 	const loadInput = useCallback(async (path: string) => {
 		setLoading(true);
 		try {
@@ -40,11 +43,12 @@ export default function TilingPreviewPanel() {
 			setInputPath(path);
 			setInputInfo(info);
 			setInputPreview(preview);
+			setTilingInputPath(path);
 		} catch (err) {
 			console.error("Failed to load image:", err);
 		}
 		setLoading(false);
-	}, []);
+	}, [setTilingInputPath]);
 
 	const clearInput = useCallback(() => {
 		setInputPath(null);
@@ -52,7 +56,8 @@ export default function TilingPreviewPanel() {
 		setInputInfo(null);
 		imageRef.current = null;
 		setImageVersion((v) => v + 1);
-	}, []);
+		setTilingInputPath(null);
+	}, [setTilingInputPath]);
 
 	// Load image element when preview changes
 	useEffect(() => {

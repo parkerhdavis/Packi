@@ -168,6 +168,36 @@ export default function AppSettings() {
 						</p>
 					</section>
 
+					{/* Default Normal Map Type */}
+					<section>
+						<h2 className="text-sm font-semibold mb-3">Default Normal Map Type</h2>
+						<div className="flex gap-3">
+							<label className="flex items-center gap-2 cursor-pointer">
+								<input
+									type="radio"
+									name="default_normal_type"
+									className="radio radio-primary radio-sm"
+									checked={settings.default_normal_type !== "directx"}
+									onChange={() => save({ default_normal_type: "opengl" })}
+								/>
+								<span className="text-sm">OpenGL</span>
+							</label>
+							<label className="flex items-center gap-2 cursor-pointer">
+								<input
+									type="radio"
+									name="default_normal_type"
+									className="radio radio-primary radio-sm"
+									checked={settings.default_normal_type === "directx"}
+									onChange={() => save({ default_normal_type: "directx" })}
+								/>
+								<span className="text-sm">DirectX</span>
+							</label>
+						</div>
+						<p className="text-xs text-base-content/40 mt-1">
+							Sets the initial Normal Map Type in the 3D preview and determines which normal map to use during autofill when filenames don't specify a convention.
+						</p>
+					</section>
+
 					{/* Default export directory */}
 					<section>
 						<h2 className="text-sm font-semibold mb-3">Default Export Directory</h2>
@@ -306,7 +336,7 @@ export default function AppSettings() {
 								className="size-10 shrink-0"
 							/>
 							<div className="text-sm text-base-content/60 space-y-1">
-								<p><strong>Packi</strong> v0.1.0</p>
+								<p><strong>Packi</strong> v{__APP_VERSION__}</p>
 								<p>Texture packing and asset prep toolkit for game artists.</p>
 								<p>
 									Developed by{" "}

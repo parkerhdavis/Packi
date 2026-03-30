@@ -3,6 +3,7 @@ import { useAppStore } from "@/stores/appStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useAdjustStore } from "@/stores/adjustStore";
 import { usePackStore } from "@/stores/packStore";
+import { usePreviewStore } from "@/stores/previewStore";
 import type { ModuleName } from "@/types";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
@@ -40,19 +41,23 @@ export default function Sidebar() {
 
 	const splashIcon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
 
-	// Collect active input file paths from the current module's store
+	// Collect active input file paths from the current module's store (scoped to active submodule)
 	const adjustInputPath = useAdjustStore((s) => s.inputPath);
 	const adjustBlendPath = useAdjustStore((s) => s.operationParams.blend.secondInputPath);
+	const packSubmodule = usePackStore((s) => s.activeSubmodule);
 	const packUnpackPath = usePackStore((s) => s.unpackInputPath);
 	const packSwizzlePath = usePackStore((s) => s.swizzleInputPath);
 	const packChannelR = usePackStore((s) => s.packChannels.r?.filePath ?? null);
 	const packChannelG = usePackStore((s) => s.packChannels.g?.filePath ?? null);
 	const packChannelB = usePackStore((s) => s.packChannels.b?.filePath ?? null);
 	const packChannelA = usePackStore((s) => s.packChannels.a?.filePath ?? null);
+	const previewSubmodule = usePreviewStore((s) => s.activeSubmodule);
+	const tilingInputPath = usePreviewStore((s) => s.tilingInputPath);
+	const materialTexturePaths = usePreviewStore((s) => s.materialTexturePaths);
 
 	const activeFilePaths = useMemo(() => {
 		const paths = new Set<string>();
-		const add = (p: string | null) => { if (p) paths.add(p); };
+		const add = (p: string | null | undefined) => { if (p) paths.add(p); };
 
 		switch (activeModule) {
 			case "adjust":
@@ -60,16 +65,36 @@ export default function Sidebar() {
 				add(adjustBlendPath);
 				break;
 			case "pack":
-				add(packUnpackPath);
-				add(packSwizzlePath);
-				add(packChannelR);
-				add(packChannelG);
-				add(packChannelB);
-				add(packChannelA);
+				switch (packSubmodule) {
+					case "unpack":
+						add(packUnpackPath);
+						break;
+					case "swizzle":
+						add(packSwizzlePath);
+						break;
+					case "pack":
+						add(packChannelR);
+						add(packChannelG);
+						add(packChannelB);
+						add(packChannelA);
+						break;
+				}
+				break;
+			case "preview":
+				switch (previewSubmodule) {
+					case "2d":
+						add(tilingInputPath);
+						break;
+					case "3d":
+						for (const p of Object.values(materialTexturePaths)) {
+							add(p);
+						}
+						break;
+				}
 				break;
 		}
 		return paths;
-	}, [activeModule, adjustInputPath, adjustBlendPath, packUnpackPath, packSwizzlePath, packChannelR, packChannelG, packChannelB, packChannelA]);
+	}, [activeModule, adjustInputPath, adjustBlendPath, packSubmodule, packUnpackPath, packSwizzlePath, packChannelR, packChannelG, packChannelB, packChannelA, previewSubmodule, tilingInputPath, materialTexturePaths]);
 
 	return (
 		<nav
@@ -102,7 +127,7 @@ export default function Sidebar() {
 								onClick={() => openUrl("https://github.com/parkerhdavis/Packi")}
 								className="text-xs text-base-content/40 hover:text-primary transition-colors leading-tight text-left cursor-pointer"
 							>
-								v0.1.0
+								Texture Toolkit
 							</button>
 						</div>
 						<button
