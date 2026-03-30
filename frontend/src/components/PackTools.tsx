@@ -3,6 +3,7 @@ import { usePackStore } from "@/stores/packStore";
 import type { PackSubmodule } from "@/stores/packStore";
 import { useAppStore } from "@/stores/appStore";
 import { useToastStore } from "@/stores/toastStore";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import PageHeader from "@/components/ui/PageHeader";
 import ExportPanel from "@/components/ui/ExportPanel";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -230,9 +231,7 @@ function PackPreview() {
 	return (
 		<div className="flex-1 min-w-0 relative">
 			{loading && (
-				<div className="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10">
-					<span className="loading loading-spinner loading-md text-primary" />
-				</div>
+				<LoadingOverlay bgClass="bg-base-100/50" />
 			)}
 			<TexturePreview
 				imageData={preview}

@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
 import DropZone from "@/components/ui/DropZone";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import { LuWand } from "react-icons/lu";
 import type { ImageInfo } from "@/types";
 
@@ -398,9 +399,7 @@ export default function MaterialPreviewPanel() {
 					title="3D Material Preview"
 				/>
 				{!sceneReady && (
-					<div className="absolute inset-0 flex items-center justify-center bg-[#1a1a2e]">
-						<span className="loading loading-spinner loading-md text-primary" />
-					</div>
+					<LoadingOverlay bgClass="bg-[#1a1a2e]" />
 				)}
 			</div>
 		</div>

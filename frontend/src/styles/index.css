@@ -70,6 +70,17 @@
 	--noise: 0;
 }
 
+/* ─── Loading overlay pulse animation ──────────────────────────────── */
+
+@keyframes logo-pulse {
+	0%, 100% { opacity: 0.3; }
+	50% { opacity: 0.8; }
+}
+
+.animate-logo-pulse {
+	animation: logo-pulse 1.8s ease-in-out infinite;
+}
+
 /* ─── Splash screen icon animation ──────────────────────────────────── */
 
 @keyframes splash-icon-in {

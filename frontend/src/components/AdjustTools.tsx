@@ -9,6 +9,7 @@ import ExportPanel from "@/components/ui/ExportPanel";
 import DropZone from "@/components/ui/DropZone";
 import CurveEditor from "@/components/ui/CurveEditor";
 import type { CurvePoint } from "@/components/ui/CurveEditor";
+import LoadingOverlay from "@/components/ui/LoadingOverlay";
 import HistorySidebar from "@/components/HistorySidebar";
 import type { ExportConfig } from "@/types";
 import {
@@ -395,9 +396,7 @@ export default function AdjustTools() {
 							After
 						</div>
 						{previewLoading && (
-							<div className="absolute inset-0 flex items-center justify-center bg-base-100/50 z-10">
-								<span className="loading loading-spinner loading-md text-primary" />
-							</div>
+							<LoadingOverlay bgClass="bg-base-100/50" />
 						)}
 						<TexturePreview
 							imageData={resultPreview ?? inputPreview}
