@@ -19,7 +19,7 @@ use channel_pack::{
 	export_packed, export_swizzled, export_unpacked, pack_channels, swizzle_channels,
 	unpack_channels,
 };
-use image_io::{list_directory, load_image_as_base64, load_image_channel, load_image_info, load_image_with_preview, save_viewport};
+use image_io::{list_directory, load_image_as_base64, load_image_as_png_bytes, load_image_channel, load_image_info, load_image_with_preview, save_viewport};
 use normal_map::{blend_normals, export_normal_result, flip_normal_green, height_to_normal, normalize_map};
 use pipeline::{apply_adjust_pipeline, export_pipeline_result};
 use presets::{delete_user_preset, get_builtin_presets, load_user_presets, save_user_preset};
@@ -89,6 +89,7 @@ fn main() {
 			save_settings,
 			load_image_info,
 			load_image_as_base64,
+			load_image_as_png_bytes,
 			load_image_with_preview,
 			load_image_channel,
 			list_directory,
