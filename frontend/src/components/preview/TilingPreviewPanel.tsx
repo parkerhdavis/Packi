@@ -1,12 +1,13 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePreviewStore } from "@/stores/previewStore";
 import DropZone from "@/components/ui/DropZone";
 import type { ImageInfo } from "@/types";
+import type { PreviewPanelHandle } from "@/types/pbr";
 
 type TilingMode = "repeat" | "mirror";
 
-export default function TilingPreviewPanel() {
+const TilingPreviewPanel = forwardRef<PreviewPanelHandle>(function TilingPreviewPanel(_props, ref) {
 	const [inputPath, setInputPath] = useState<string | null>(null);
 	const [inputPreview, setInputPreview] = useState<string | null>(null);
 	const [inputInfo, setInputInfo] = useState<ImageInfo | null>(null);
@@ -32,6 +33,15 @@ export default function TilingPreviewPanel() {
 	const [fitMode, setFitMode] = useState(true);
 
 	const setTilingInputPath = usePreviewStore((s) => s.setTilingInputPath);
+
+	const captureViewport = useCallback((): string | null => {
+		const canvas = canvasRef.current;
+		if (!canvas || canvas.width <= 1) return null;
+		const dataUrl = canvas.toDataURL("image/png");
+		return dataUrl.replace(/^data:image\/png;base64,/, "");
+	}, []);
+
+	useImperativeHandle(ref, () => ({ captureViewport }), [captureViewport]);
 
 	const loadInput = useCallback(async (path: string) => {
 		setLoading(true);
@@ -379,4 +389,6 @@ export default function TilingPreviewPanel() {
 			</div>
 		</div>
 	);
-}
+});
+
+export default TilingPreviewPanel;
