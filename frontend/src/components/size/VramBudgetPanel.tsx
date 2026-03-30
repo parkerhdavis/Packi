@@ -12,20 +12,19 @@ export default function VramBudgetPanel() {
 	const info = useSizeStore((s) => s.inputInfo);
 	const preview = useSizeStore((s) => s.inputPreview);
 	const [includeMips, setIncludeMips] = useState(true);
-	const [selectedRes, setSelectedRes] = useState<string>("actual");
+	const [selectedIndex, setSelectedIndex] = useState(0);
 
-	// Build resolution options: actual + standard sizes
-	const resolutionOptions = useMemo(() => {
+	// Build resolution steps: actual first, then standard sizes descending
+	const resolutionSteps = useMemo(() => {
 		if (!info) return [];
-		const options: { value: string; label: string; width: number; height: number }[] = [
-			{ value: "actual", label: `${info.width}×${info.height} (actual)`, width: info.width, height: info.height },
+		const steps: { label: string; width: number; height: number }[] = [
+			{ label: `${info.width}×${info.height} (actual)`, width: info.width, height: info.height },
 		];
 		for (const size of STANDARD_RESOLUTIONS) {
-			// Skip if it matches the actual resolution exactly
 			if (size === info.width && size === info.height) continue;
-			options.push({ value: `${size}`, label: `${size}×${size}`, width: size, height: size });
+			steps.push({ label: `${size}×${size}`, width: size, height: size });
 		}
-		return options;
+		return steps;
 	}, [info]);
 
 	if (!info) {
@@ -36,7 +35,8 @@ export default function VramBudgetPanel() {
 		);
 	}
 
-	const activeRes = resolutionOptions.find((r) => r.value === selectedRes) ?? resolutionOptions[0];
+	const clampedIndex = Math.min(selectedIndex, resolutionSteps.length - 1);
+	const activeRes = resolutionSteps[clampedIndex] ?? resolutionSteps[0];
 	const { width, height } = activeRes;
 
 	const estimates = GPU_FORMATS.map((fmt) => {
@@ -65,20 +65,24 @@ export default function VramBudgetPanel() {
 						</label>
 					</div>
 
-					{/* Resolution selector */}
+					{/* Resolution slider */}
 					<div className="mb-3">
-						<label className="text-xs text-base-content/50 mb-0.5 block">Resolution</label>
-						<select
-							value={selectedRes}
-							onChange={(e) => setSelectedRes(e.target.value)}
-							className="select select-xs select-bordered w-full"
-						>
-							{resolutionOptions.map((opt) => (
-								<option key={opt.value} value={opt.value}>
-									{opt.label}
-								</option>
-							))}
-						</select>
+						<label className="text-xs text-base-content/50 mb-1 block">
+							Resolution: {activeRes.label}
+						</label>
+						<input
+							type="range"
+							min="0"
+							max={resolutionSteps.length - 1}
+							step="1"
+							value={clampedIndex}
+							onChange={(e) => setSelectedIndex(Number.parseInt(e.target.value))}
+							className="range range-primary range-xs w-full"
+						/>
+						<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
+							<span>Actual</span>
+							<span>32</span>
+						</div>
 					</div>
 
 					<div className="text-xs text-base-content/40 mb-3">
