@@ -228,7 +228,19 @@ pub async fn export_unpacked(
 		let (w, h) = rgba.dimensions();
 		let mut gray = image::GrayImage::new(w, h);
 		for (x, y, pixel) in rgba.enumerate_pixels() {
-			gray.put_pixel(x, y, image::Luma([pixel[channel as usize]]));
+			let val = match channel {
+				0 => pixel[0],
+				1 => pixel[1],
+				2 => pixel[2],
+				3 => pixel[3],
+				_ => {
+					let r = pixel[0] as f32;
+					let g = pixel[1] as f32;
+					let b = pixel[2] as f32;
+					(0.2126 * r + 0.7152 * g + 0.0722 * b).round() as u8
+				}
+			};
+			gray.put_pixel(x, y, image::Luma([val]));
 		}
 		save_image(&DynamicImage::ImageLuma8(gray), &output_path, &format, 8)
 	})

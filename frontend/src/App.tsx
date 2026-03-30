@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useAppStore } from "@/stores/appStore";
+import type { ModuleName } from "@/types";
 import Sidebar from "@/components/Sidebar";
 import PackTools from "@/components/PackTools";
 import AdjustTools from "@/components/AdjustTools";
@@ -34,8 +35,9 @@ export default function App() {
 	useEffect(() => {
 		if (!loaded) return;
 		const settings = useSettingsStore.getState().settings;
-		if (settings.last_module && settings.last_module !== "settings") {
-			useAppStore.getState().setActiveModule(settings.last_module as typeof activeModule);
+		const validModules: ModuleName[] = ["pack", "adjust", "preview", "size", "batch-processor"];
+		if (settings.last_module && validModules.includes(settings.last_module as ModuleName)) {
+			useAppStore.getState().setActiveModule(settings.last_module as ModuleName);
 		}
 		if (settings.sidebar_open !== null) {
 			useAppStore.getState().setSidebarOpen(settings.sidebar_open);

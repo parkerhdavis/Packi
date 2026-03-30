@@ -212,7 +212,10 @@ fn process_single_file(
 	}
 
 	let output_path = Path::new(output_dir).join(format!("{}.{}", output_name, output_ext));
-	save_image(&img, output_path.to_str().unwrap_or(""), &save_format, bit_depth)
+	let output_str = output_path
+		.to_str()
+		.ok_or_else(|| format!("Output path contains invalid UTF-8: {:?}", output_path))?;
+	save_image(&img, output_str, &save_format, bit_depth)
 }
 
 fn format_to_extension(format: &str) -> String {

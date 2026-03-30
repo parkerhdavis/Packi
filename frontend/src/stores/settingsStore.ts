@@ -37,7 +37,6 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 			if (settings.last_module === "tiling") settings.last_module = "preview";
 			if (settings.last_module === "file-sizing") settings.last_module = "size";
 			applyTheme(settings.theme);
-			applyZoom(settings.zoom);
 			set({ settings, loaded: true });
 		} catch (err) {
 			console.error("Failed to load settings:", err);
@@ -66,19 +65,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 	zoomIn: async () => {
 		const current = get().settings.zoom ?? 100;
 		const next = Math.min(current + 5, 200);
-		applyZoom(next);
 		await get().save({ zoom: next });
 	},
 
 	zoomOut: async () => {
 		const current = get().settings.zoom ?? 100;
 		const next = Math.max(current - 5, 50);
-		applyZoom(next);
 		await get().save({ zoom: next });
 	},
 
 	zoomReset: async () => {
-		applyZoom(100);
 		await get().save({ zoom: 100 });
 	},
 }));
@@ -90,6 +86,3 @@ function applyTheme(theme: string | null) {
 	);
 }
 
-function applyZoom(_zoom: number | null) {
-	document.documentElement.style.zoom = "";
-}
