@@ -3,7 +3,7 @@
 
 A free, open-source, offline desktop application that bundles common game-artist texture tools into a lightweight standalone app with local-only processing.
 
-Packi isn't a replacement for any DCC; rather, it's a helpful sidecar for texture prep that doesn't need all that extra weight: packing channels, normal map ops, batch-converting formats, adjusting curves, previewing materials, estimating VRAM budgets, etc. These are operations artists often solve with ad-hoc Photoshop actions, single-purpose web tools, or CLI utilities they'd rather not have to deal with.
+Packi isn't a replacement for any DCC; rather, it's a helpful sidecar for texture tasks that don't need all that extra weight: packing channels, normal map ops, batch-converting formats, adjusting curves, previewing materials, estimating VRAM budgets, etc. These are operations artists often solve with ad-hoc Photoshop actions, single-purpose web tools, or CLI utilities they'd rather not have to deal with.
 
 
 ## Stack
