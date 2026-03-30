@@ -5,6 +5,9 @@ const MOVE_SPEED = 350;
 const JUMP_VELOCITY = -600;
 const GROUND_FRICTION = 0.75;
 const SPRITE_SIZE = 120; // size-30 = 7.5rem = 120px
+const BACKFLIP_SPEED = 480; // degrees/sec
+const WOBBLE_FREQ = 14; // oscillations/sec
+const WOBBLE_AMPLITUDE = 15; // degrees
 
 interface Position {
 	x: number;
@@ -17,6 +20,7 @@ export default function useAlpacaGame() {
 	const [active, setActive] = useState(false);
 	const [position, setPosition] = useState<Position>({ x: 0, y: 0 });
 	const [facing, setFacing] = useState<Facing>("right");
+	const [rotation, setRotation] = useState(0);
 
 	const containerRef = useRef<HTMLDivElement>(null);
 	const logoRef = useRef<HTMLImageElement>(null);
@@ -28,6 +32,9 @@ export default function useAlpacaGame() {
 		vy: 0,
 		grounded: false,
 		facing: "right" as Facing,
+		backflipping: false,
+		backflipAngle: 0,
+		wobbleTime: 0,
 	});
 	const keysRef = useRef(new Set<string>());
 	const rafRef = useRef<number>(0);
@@ -79,6 +86,10 @@ export default function useAlpacaGame() {
 			s.y = maxY;
 			s.vy = 0;
 			s.grounded = true;
+			if (s.backflipping) {
+				s.backflipping = false;
+				s.backflipAngle = 0;
+			}
 		}
 
 		// Collision: ceiling
@@ -96,8 +107,25 @@ export default function useAlpacaGame() {
 			s.vx = 0;
 		}
 
+		// Rotation: backflip or wobble
+		let rot = 0;
+		if (s.backflipping) {
+			s.backflipAngle += BACKFLIP_SPEED * dt;
+			if (s.backflipAngle >= 360) {
+				s.backflipAngle = 0;
+				s.backflipping = false;
+			}
+			rot = s.backflipAngle;
+		} else if (Math.abs(s.vx) > 5) {
+			s.wobbleTime += dt;
+			rot = Math.sin(s.wobbleTime * WOBBLE_FREQ * Math.PI * 2) * WOBBLE_AMPLITUDE;
+		} else {
+			s.wobbleTime = 0;
+		}
+
 		setPosition({ x: s.x, y: s.y });
 		setFacing(s.facing);
+		setRotation(rot);
 
 		rafRef.current = requestAnimationFrame(loop);
 	}, []);
@@ -118,10 +146,14 @@ export default function useAlpacaGame() {
 			vy: 0,
 			grounded: false,
 			facing: "right",
+			backflipping: true,
+			backflipAngle: 0,
+			wobbleTime: 0,
 		};
 
 		setPosition({ x: startX, y: startY });
 		setFacing("right");
+		setRotation(0);
 		setActive(true);
 	}, []);
 
@@ -183,5 +215,5 @@ export default function useAlpacaGame() {
 		};
 	}, []);
 
-	return { active, position, facing, containerRef, logoRef, activate, deactivate };
+	return { active, position, facing, rotation, containerRef, logoRef, activate, deactivate };
 }

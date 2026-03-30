@@ -4,7 +4,7 @@ import useAlpacaGame from "@/hooks/useAlpacaGame";
 
 export default function AboutPanel() {
 	const theme = useSettingsStore((s) => s.settings.theme);
-	const { active, position, facing, containerRef, logoRef, activate } = useAlpacaGame();
+	const { active, position, facing, rotation, containerRef, logoRef, activate } = useAlpacaGame();
 
 	const logoSrc = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
 
@@ -50,7 +50,7 @@ export default function AboutPanel() {
 					style={{
 						left: position.x,
 						top: position.y,
-						transform: facing === "left" ? "scaleX(-1)" : undefined,
+						transform: `${facing === "left" ? "scaleX(-1) " : ""}rotate(${rotation}deg)`,
 					}}
 				/>
 			)}
