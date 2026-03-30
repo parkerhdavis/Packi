@@ -48,6 +48,7 @@ type MapKey = typeof mapSlots[number]["key"];
 export default function MaterialPreviewPanel() {
 	const iframeRef = useRef<HTMLIFrameElement>(null);
 	const [iframeReady, setIframeReady] = useState(false);
+	const [sceneReady, setSceneReady] = useState(false);
 
 	// Texture slots
 	const [textures, setTextures] = useState<Record<MapKey, TextureSlot>>({
@@ -92,7 +93,7 @@ export default function MaterialPreviewPanel() {
 		iframe.contentWindow.postMessage({ type: "packi-pbr-update", config }, "*");
 	}, []);
 
-	// Push initial config + environment when iframe is ready
+	// Push initial config + environment when iframe is ready, then reveal after env loads
 	useEffect(() => {
 		if (!iframeReady) return;
 		const envUrl = `./media/env-${environment}-lq.exr`;
@@ -110,6 +111,9 @@ export default function MaterialPreviewPanel() {
 			environment_name: [environment],
 			environment_index: 0,
 		});
+		// Brief delay to let PBR.ONE load the environment map before revealing
+		const timer = setTimeout(() => setSceneReady(true), 800);
+		return () => clearTimeout(timer);
 	}, [iframeReady]);
 
 	// Push control changes
@@ -189,23 +193,24 @@ export default function MaterialPreviewPanel() {
 	}, [sendConfig]);
 
 	// Autofill: scan input directory for files matching each slot's keywords
+	// Autofill: scan input directory for files matching each slot's keywords (parallel)
 	const handleAutofill = useCallback(async () => {
 		if (!inputDir) return;
 		setAutofilling(true);
 		try {
 			const files = await invoke<string[]>("list_image_files", { dir: inputDir });
+			const loads: Promise<void>[] = [];
 			for (const slot of mapSlots) {
-				// Skip slots that already have a texture
 				if (textures[slot.key].path) continue;
-				// Find first file whose name (case-insensitive) contains any keyword
 				const match = files.find((filePath) => {
 					const filename = filePath.split(/[/\\]/).pop()?.toLowerCase() ?? "";
 					return slot.keywords.some((kw) => filename.includes(kw));
 				});
 				if (match) {
-					await loadTexture(slot.key, match);
+					loads.push(loadTexture(slot.key, match));
 				}
 			}
+			await Promise.all(loads);
 		} catch (err) {
 			console.error("Autofill failed:", err);
 		}
@@ -392,8 +397,8 @@ export default function MaterialPreviewPanel() {
 					className="w-full h-full border-none"
 					title="3D Material Preview"
 				/>
-				{!iframeReady && (
-					<div className="absolute inset-0 flex items-center justify-center bg-base-100/80">
+				{!sceneReady && (
+					<div className="absolute inset-0 flex items-center justify-center bg-[#1a1a2e]">
 						<span className="loading loading-spinner loading-md text-primary" />
 					</div>
 				)}
