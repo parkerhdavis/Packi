@@ -1,13 +1,16 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod adjust;
 mod batch;
 mod channel_pack;
 mod image_io;
 mod normal_map;
+mod pipeline;
 mod presets;
 mod settings;
 
+use adjust::{adjust_hue, adjust_saturation, apply_luminance_curve, export_adjust_result};
 use batch::{
 	delete_pipeline_preset, list_image_files, load_pipeline_presets, preview_batch, run_batch,
 	save_pipeline_preset,
@@ -15,6 +18,7 @@ use batch::{
 use channel_pack::{export_packed, pack_channels};
 use image_io::{list_directory, load_image_as_base64, load_image_channel, load_image_info};
 use normal_map::{blend_normals, export_normal_result, flip_normal_green, height_to_normal, normalize_map};
+use pipeline::{apply_adjust_pipeline, export_pipeline_result};
 use presets::{delete_user_preset, get_builtin_presets, load_user_presets, save_user_preset};
 use settings::{load_settings, save_settings};
 use tauri::Manager;
@@ -86,11 +90,17 @@ fn main() {
 			load_user_presets,
 			save_user_preset,
 			delete_user_preset,
+			apply_luminance_curve,
+			adjust_hue,
+			adjust_saturation,
+			export_adjust_result,
 			flip_normal_green,
 			height_to_normal,
 			blend_normals,
 			normalize_map,
 			export_normal_result,
+			apply_adjust_pipeline,
+			export_pipeline_result,
 			preview_batch,
 			run_batch,
 			list_image_files,

@@ -3,7 +3,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useAppStore } from "@/stores/appStore";
 import Sidebar from "@/components/Sidebar";
 import ChannelPacker from "@/components/ChannelPacker";
-import NormalMapTools from "@/components/NormalMapTools";
+import AdjustTools from "@/components/AdjustTools";
 import BatchProcessor from "@/components/BatchProcessor";
 import TilingTools from "@/components/TilingTools";
 import FileSizing from "@/components/FileSizing";
@@ -68,21 +68,46 @@ export default function App() {
 		return () => window.removeEventListener("keydown", handleZoom);
 	}, [zoomIn, zoomOut, zoomReset]);
 
-	// Global module switching: Ctrl+1/2/3 and sidebar toggle: Ctrl+/
+	// Global module switching: Ctrl+1/2/3, sidebar toggle: Ctrl+/, history: Ctrl+\
 	useEffect(() => {
 		const handleKeys = (e: KeyboardEvent) => {
 			if (!(e.ctrlKey || e.metaKey)) return;
 			const setModule = useAppStore.getState().setActiveModule;
-			if (e.key === "1") { e.preventDefault(); setModule("channel-packer"); }
-			else if (e.key === "2") { e.preventDefault(); setModule("normal-tools"); }
+			if (e.key === "1") { e.preventDefault(); setModule("adjust"); }
+			else if (e.key === "2") { e.preventDefault(); setModule("channel-packer"); }
 			else if (e.key === "3") { e.preventDefault(); setModule("tiling"); }
 			else if (e.key === "4") { e.preventDefault(); setModule("file-sizing"); }
 			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
 			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
+			else if (e.key === "\\") { e.preventDefault(); useAppStore.getState().toggleHistorySidebar(); }
 		};
 		window.addEventListener("keydown", handleKeys);
 		return () => window.removeEventListener("keydown", handleKeys);
 	}, [toggleSidebar]);
+
+	// Global undo/redo: Ctrl+Z, Ctrl+Y, Ctrl+Shift+Z
+	useEffect(() => {
+		const handleUndoRedo = async (e: KeyboardEvent) => {
+			if (!(e.ctrlKey || e.metaKey)) return;
+			// Don't intercept when focused in text inputs (let browser handle native undo)
+			const tag = (e.target as HTMLElement)?.tagName;
+			if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+			const { useUndoStore } = await import("@/stores/undoStore");
+			if (e.key === "z" && !e.shiftKey) {
+				e.preventDefault();
+				useUndoStore.getState().undo();
+			} else if (e.key === "z" && e.shiftKey) {
+				e.preventDefault();
+				useUndoStore.getState().redo();
+			} else if (e.key === "y") {
+				e.preventDefault();
+				useUndoStore.getState().redo();
+			}
+		};
+		window.addEventListener("keydown", handleUndoRedo);
+		return () => window.removeEventListener("keydown", handleUndoRedo);
+	}, []);
 
 	// Splash: wait for settings to load, fade in icon+text, linger, then fade out
 	useEffect(() => {
@@ -119,8 +144,8 @@ export default function App() {
 		switch (activeModule) {
 			case "channel-packer":
 				return <ChannelPacker />;
-			case "normal-tools":
-				return <NormalMapTools />;
+			case "adjust":
+				return <AdjustTools />;
 			case "tiling":
 				return <TilingTools />;
 			case "file-sizing":

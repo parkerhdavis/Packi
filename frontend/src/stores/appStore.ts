@@ -4,14 +4,17 @@ import type { ModuleName } from "@/types";
 interface AppState {
 	activeModule: ModuleName;
 	sidebarOpen: boolean;
+	historySidebarOpen: boolean;
 	setActiveModule: (module: ModuleName) => void;
 	setSidebarOpen: (open: boolean) => void;
 	toggleSidebar: () => void;
+	toggleHistorySidebar: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
 	activeModule: "channel-packer",
 	sidebarOpen: true,
+	historySidebarOpen: false,
 
 	setActiveModule: (module) => {
 		set({ activeModule: module });
@@ -23,5 +26,9 @@ export const useAppStore = create<AppState>((set) => ({
 
 	toggleSidebar: () => {
 		set((s) => ({ sidebarOpen: !s.sidebarOpen }));
+	},
+
+	toggleHistorySidebar: () => {
+		set((s) => ({ historySidebarOpen: !s.historySidebarOpen }));
 	},
 }));

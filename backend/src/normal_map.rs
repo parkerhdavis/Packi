@@ -16,49 +16,21 @@ fn maybe_resize(img: DynamicImage, max_size: Option<u32>) -> DynamicImage {
 	}
 }
 
-/// Flip the green channel of a normal map (DX ↔ OpenGL conversion).
-#[tauri::command]
-pub async fn flip_normal_green(
-	path: String,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || flip_normal_green_sync(&path, max_preview_size))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
-}
+// --- Pure in-memory image-processing functions ---
 
-fn flip_normal_green_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
-	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
-	let mut rgba = img.to_rgba8();
-
+/// Flip the green channel of an RGBA image (DX ↔ OpenGL conversion).
+pub fn flip_green_on_image(mut rgba: RgbaImage) -> RgbaImage {
 	for pixel in rgba.pixels_mut() {
 		pixel[1] = 255 - pixel[1];
 	}
-
-	encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	rgba
 }
 
-/// Generate a normal map from a grayscale heightmap using Sobel filtering.
-#[tauri::command]
-pub async fn height_to_normal(
-	path: String,
-	strength: f32,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || height_to_normal_sync(&path, strength, max_preview_size))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
-}
-
-fn height_to_normal_sync(
-	path: &str,
-	strength: f32,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
-	let gray = img.to_luma8();
+/// Generate a normal map from an RGBA image using Sobel filtering.
+/// Converts to grayscale internally.
+pub fn height_to_normal_on_image(rgba: &RgbaImage, strength: f32) -> RgbaImage {
+	let gray = image::DynamicImage::ImageRgba8(rgba.clone()).to_luma8();
 	let (w, h) = gray.dimensions();
-
 	let mut normal = RgbaImage::new(w, h);
 
 	for y in 0..h {
@@ -99,42 +71,25 @@ fn height_to_normal_sync(
 		}
 	}
 
-	encode_to_base64_png(&DynamicImage::ImageRgba8(normal))
+	normal
 }
 
-/// Blend two normal maps using Reoriented Normal Mapping (RNM).
-#[tauri::command]
-pub async fn blend_normals(
-	path_a: String,
-	path_b: String,
+/// Blend two RGBA normal maps using Reoriented Normal Mapping (RNM).
+/// `rgba_b` is resized to match `rgba_a` if dimensions differ.
+pub fn blend_normals_on_image(
+	rgba_a: &RgbaImage,
+	rgba_b: &RgbaImage,
 	blend_factor: f32,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || {
-		blend_normals_sync(&path_a, &path_b, blend_factor, max_preview_size)
-	})
-	.await
-	.map_err(|e| format!("Task failed: {}", e))?
-}
-
-fn blend_normals_sync(
-	path_a: &str,
-	path_b: &str,
-	blend_factor: f32,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	let img_a = maybe_resize(load_dynamic_image(path_a)?, max_preview_size);
-	let img_b = load_dynamic_image(path_b)?;
-
-	let rgba_a = img_a.to_rgba8();
+) -> RgbaImage {
 	let (w, h) = rgba_a.dimensions();
 
-	let img_b = if img_b.dimensions() != (w, h) {
-		img_b.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
+	let rgba_b = if rgba_b.dimensions() != (w, h) {
+		image::DynamicImage::ImageRgba8(rgba_b.clone())
+			.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
+			.to_rgba8()
 	} else {
-		img_b
+		rgba_b.clone()
 	};
-	let rgba_b = img_b.to_rgba8();
 
 	let mut result = RgbaImage::new(w, h);
 
@@ -189,24 +144,11 @@ fn blend_normals_sync(
 		}
 	}
 
-	encode_to_base64_png(&DynamicImage::ImageRgba8(result))
+	result
 }
 
-/// Re-normalize a normal map to unit length.
-#[tauri::command]
-pub async fn normalize_map(
-	path: String,
-	max_preview_size: Option<u32>,
-) -> Result<String, String> {
-	tokio::task::spawn_blocking(move || normalize_map_sync(&path, max_preview_size))
-		.await
-		.map_err(|e| format!("Task failed: {}", e))?
-}
-
-fn normalize_map_sync(path: &str, max_preview_size: Option<u32>) -> Result<String, String> {
-	let img = maybe_resize(load_dynamic_image(path)?, max_preview_size);
-	let mut rgba = img.to_rgba8();
-
+/// Re-normalize vectors to unit length in an RGBA normal map.
+pub fn normalize_on_image(mut rgba: RgbaImage) -> RgbaImage {
 	for pixel in rgba.pixels_mut() {
 		let mut n = [
 			pixel[0] as f32 / 255.0 * 2.0 - 1.0,
@@ -226,10 +168,80 @@ fn normalize_map_sync(path: &str, max_preview_size: Option<u32>) -> Result<Strin
 		pixel[2] = ((n[2] * 0.5 + 0.5) * 255.0).round() as u8;
 	}
 
-	encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	rgba
 }
 
-/// Export a normal map operation result to disk (always full resolution).
+// --- Tauri commands (thin wrappers) ---
+
+#[tauri::command]
+pub async fn flip_normal_green(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		let rgba = flip_green_on_image(img.to_rgba8());
+		encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn height_to_normal(
+	path: String,
+	strength: f32,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		let rgba = img.to_rgba8();
+		let result = height_to_normal_on_image(&rgba, strength);
+		encode_to_base64_png(&DynamicImage::ImageRgba8(result))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn blend_normals(
+	path_a: String,
+	path_b: String,
+	blend_factor: f32,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || {
+		let img_a = maybe_resize(load_dynamic_image(&path_a)?, max_preview_size);
+		let img_b = load_dynamic_image(&path_b)?;
+		let rgba_a = img_a.to_rgba8();
+		let (w, h) = rgba_a.dimensions();
+		let img_b = if img_b.dimensions() != (w, h) {
+			img_b.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
+		} else {
+			img_b
+		};
+		let rgba_b = img_b.to_rgba8();
+		let result = blend_normals_on_image(&rgba_a, &rgba_b, blend_factor);
+		encode_to_base64_png(&DynamicImage::ImageRgba8(result))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
+#[tauri::command]
+pub async fn normalize_map(
+	path: String,
+	max_preview_size: Option<u32>,
+) -> Result<String, String> {
+	tokio::task::spawn_blocking(move || {
+		let img = maybe_resize(load_dynamic_image(&path)?, max_preview_size);
+		let rgba = normalize_on_image(img.to_rgba8());
+		encode_to_base64_png(&DynamicImage::ImageRgba8(rgba))
+	})
+	.await
+	.map_err(|e| format!("Task failed: {}", e))?
+}
+
 #[tauri::command]
 pub async fn export_normal_result(
 	operation: String,
@@ -241,28 +253,23 @@ pub async fn export_normal_result(
 	blend_factor: Option<f32>,
 ) -> Result<(), String> {
 	tokio::task::spawn_blocking(move || {
-		let result_base64 = match operation.as_str() {
-			"flip" => flip_normal_green_sync(&path, None)?,
-			"height-to-normal" => {
-				height_to_normal_sync(&path, strength.unwrap_or(1.0), None)?
-			}
+		let img = load_dynamic_image(&path)?;
+		let rgba = img.to_rgba8();
+
+		let result = match operation.as_str() {
+			"flip" => flip_green_on_image(rgba),
+			"height-to-normal" => height_to_normal_on_image(&rgba, strength.unwrap_or(1.0)),
 			"blend" => {
 				let second = second_path.as_deref().ok_or("Second path required for blend")?;
-				blend_normals_sync(&path, second, blend_factor.unwrap_or(0.5), None)?
+				let img_b = load_dynamic_image(second)?;
+				let rgba_b = img_b.to_rgba8();
+				blend_normals_on_image(&rgba, &rgba_b, blend_factor.unwrap_or(0.5))
 			}
-			"normalize" => normalize_map_sync(&path, None)?,
+			"normalize" => normalize_on_image(rgba),
 			_ => return Err(format!("Unknown operation: {}", operation)),
 		};
 
-		use base64::Engine;
-		let bytes = base64::engine::general_purpose::STANDARD
-			.decode(&result_base64)
-			.map_err(|e| format!("Failed to decode result: {}", e))?;
-
-		let img = image::load_from_memory(&bytes)
-			.map_err(|e| format!("Failed to load result image: {}", e))?;
-
-		save_image(&img, &output_path, &format, 8)
+		save_image(&DynamicImage::ImageRgba8(result), &output_path, &format, 8)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
