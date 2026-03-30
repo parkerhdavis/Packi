@@ -5,7 +5,7 @@ import Sidebar from "@/components/Sidebar";
 import PackTools from "@/components/PackTools";
 import AdjustTools from "@/components/AdjustTools";
 import BatchProcessor from "@/components/BatchProcessor";
-import TilingTools from "@/components/TilingTools";
+import PreviewTools from "@/components/PreviewTools";
 import FileSizing from "@/components/FileSizing";
 import AppSettings from "@/components/AppSettings";
 import StatusBar from "@/components/ui/StatusBar";
@@ -75,7 +75,7 @@ export default function App() {
 			const setModule = useAppStore.getState().setActiveModule;
 			if (e.key === "1") { e.preventDefault(); setModule("adjust"); }
 			else if (e.key === "2") { e.preventDefault(); setModule("pack"); }
-			else if (e.key === "3") { e.preventDefault(); setModule("tiling"); }
+			else if (e.key === "3") { e.preventDefault(); setModule("preview"); }
 			else if (e.key === "4") { e.preventDefault(); setModule("file-sizing"); }
 			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
 			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
@@ -146,8 +146,8 @@ export default function App() {
 				return <PackTools />;
 			case "adjust":
 				return <AdjustTools />;
-			case "tiling":
-				return <TilingTools />;
+			case "preview":
+				return <PreviewTools />;
 			case "file-sizing":
 				return <FileSizing />;
 			case "batch-processor":

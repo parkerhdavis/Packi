@@ -19,7 +19,7 @@ export interface DirEntry {
 export type ModuleName =
 	| "pack"
 	| "adjust"
-	| "tiling"
+	| "preview"
 	| "file-sizing"
 	| "batch-processor"
 	| "settings";
