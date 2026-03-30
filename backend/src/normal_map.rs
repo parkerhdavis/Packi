@@ -1,4 +1,4 @@
-use image::{DynamicImage, GenericImageView, RgbaImage};
+use image::{DynamicImage, RgbaImage};
 
 use crate::image_io::{encode_to_base64_png, load_dynamic_image, maybe_resize, save_image};
 
