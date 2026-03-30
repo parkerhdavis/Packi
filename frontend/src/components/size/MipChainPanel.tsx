@@ -1,53 +1,80 @@
-import { useMemo, useEffect, useState, useRef } from "react";
+import { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { useSizeStore } from "@/stores/sizeStore";
 import { computeMipLevels, GPU_FORMATS, formatBytes } from "@/components/size/vramFormats";
-
-/** Generate a canvas-downscaled data URL for a given mip level */
-function generateMipPreview(
-	sourceImg: HTMLImageElement,
-	width: number,
-	height: number,
-): string {
-	const canvas = document.createElement("canvas");
-	canvas.width = width;
-	canvas.height = height;
-	const ctx = canvas.getContext("2d")!;
-	ctx.imageSmoothingEnabled = true;
-	ctx.imageSmoothingQuality = "high";
-	ctx.drawImage(sourceImg, 0, 0, width, height);
-	return canvas.toDataURL("image/png");
-}
 
 export default function MipChainPanel() {
 	const info = useSizeStore((s) => s.inputInfo);
 	const preview = useSizeStore((s) => s.inputPreview);
-	const [mipPreviews, setMipPreviews] = useState<string[]>([]);
-	const imgRef = useRef<HTMLImageElement | null>(null);
+	const [mipPreviews, setMipPreviews] = useState<(string | null)[]>([]);
 	const [selectedFormat, setSelectedFormat] = useState("BC7");
+	const containerRef = useRef<HTMLDivElement>(null);
+	const [containerWidth, setContainerWidth] = useState(800);
 
 	const mipLevels = useMemo(() => {
 		if (!info) return [];
 		return computeMipLevels(info.width, info.height);
 	}, [info]);
 
-	const format = GPU_FORMATS.find((f) => f.name.startsWith(selectedFormat)) ?? GPU_FORMATS[6]; // BC7 default
+	const format = GPU_FORMATS.find((f) => f.name.startsWith(selectedFormat)) ?? GPU_FORMATS[6];
 
-	// Generate mip previews when the input changes
+	// Measure container width for scaling
+	useEffect(() => {
+		const el = containerRef.current;
+		if (!el) return;
+		const observer = new ResizeObserver((entries) => {
+			for (const entry of entries) {
+				setContainerWidth(entry.contentRect.width);
+			}
+		});
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, []);
+
+	// Generate mip previews incrementally
 	useEffect(() => {
 		if (!preview || mipLevels.length === 0) {
 			setMipPreviews([]);
 			return;
 		}
 
+		// Start with all nulls (loading state)
+		setMipPreviews(new Array(mipLevels.length).fill(null));
+
 		const img = new Image();
+		let cancelled = false;
+
 		img.onload = () => {
-			imgRef.current = img;
-			const previews = mipLevels.map((lvl) =>
-				generateMipPreview(img, lvl.width, lvl.height),
-			);
-			setMipPreviews(previews);
+			if (cancelled) return;
+
+			// Generate each mip level one at a time, yielding to the event loop between each
+			let i = 0;
+			const generateNext = () => {
+				if (cancelled || i >= mipLevels.length) return;
+				const lvl = mipLevels[i];
+				const canvas = document.createElement("canvas");
+				canvas.width = lvl.width;
+				canvas.height = lvl.height;
+				const ctx = canvas.getContext("2d")!;
+				ctx.imageSmoothingEnabled = true;
+				ctx.imageSmoothingQuality = "high";
+				ctx.drawImage(img, 0, 0, lvl.width, lvl.height);
+				const dataUrl = canvas.toDataURL("image/png");
+
+				const idx = i;
+				setMipPreviews((prev) => {
+					const next = [...prev];
+					next[idx] = dataUrl;
+					return next;
+				});
+
+				i++;
+				requestAnimationFrame(generateNext);
+			};
+			requestAnimationFrame(generateNext);
 		};
 		img.src = preview.startsWith("data:") ? preview : `data:image/png;base64,${preview}`;
+
+		return () => { cancelled = true; };
 	}, [preview, mipLevels]);
 
 	if (!info) {
@@ -60,9 +87,11 @@ export default function MipChainPanel() {
 
 	const totalSize = mipLevels.reduce((sum, lvl) => sum + format.sizeBytes(lvl.width, lvl.height), 0);
 
-	// Scale factor so the largest mip fits reasonably in the view
-	const maxDisplaySize = 256;
-	const scale = Math.min(1, maxDisplaySize / Math.max(info.width, info.height));
+	// Scale so the cascade fills the available width with some padding
+	const totalCascadeWidth = mipLevels.reduce((sum, lvl) => sum + lvl.width, 0)
+		+ (mipLevels.length - 1) * 12; // gap
+	const availableWidth = containerWidth - 32; // padding
+	const scale = Math.min(1, availableWidth / totalCascadeWidth);
 
 	return (
 		<div className="flex-1 min-w-0 flex flex-col">
@@ -95,12 +124,13 @@ export default function MipChainPanel() {
 			</div>
 
 			{/* Mip cascade */}
-			<div className="flex-1 overflow-auto p-4">
+			<div ref={containerRef} className="flex-1 overflow-auto p-4">
 				<div className="flex flex-wrap items-end gap-3">
 					{mipLevels.map((lvl, i) => {
 						const displayW = Math.max(8, Math.round(lvl.width * scale));
 						const displayH = Math.max(8, Math.round(lvl.height * scale));
 						const levelSize = format.sizeBytes(lvl.width, lvl.height);
+						const loaded = mipPreviews[i] != null;
 
 						return (
 							<div key={i} className="flex flex-col items-center gap-1">
@@ -114,15 +144,15 @@ export default function MipChainPanel() {
 										minHeight: 8,
 									}}
 								>
-									{mipPreviews[i] ? (
+									{loaded ? (
 										<img
-											src={mipPreviews[i]}
+											src={mipPreviews[i]!}
 											alt={`Mip ${i}`}
 											className="w-full h-full"
 											style={{ imageRendering: displayW < 32 ? "pixelated" : "auto" }}
 										/>
 									) : (
-										<div className="w-full h-full bg-base-300/50" />
+										<span className="loading loading-spinner" style={{ width: Math.min(16, displayW - 4), height: Math.min(16, displayH - 4) }} />
 									)}
 								</div>
 

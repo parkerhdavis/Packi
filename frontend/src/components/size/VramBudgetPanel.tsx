@@ -1,12 +1,32 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSizeStore } from "@/stores/sizeStore";
 import TexturePreview from "@/components/ui/TexturePreview";
 import { GPU_FORMATS, computeTotalWithMips, formatBytes } from "@/components/size/vramFormats";
+
+/** Standard power-of-two resolutions from 16384 down to 32 */
+const STANDARD_RESOLUTIONS = [
+	16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32,
+];
 
 export default function VramBudgetPanel() {
 	const info = useSizeStore((s) => s.inputInfo);
 	const preview = useSizeStore((s) => s.inputPreview);
 	const [includeMips, setIncludeMips] = useState(true);
+	const [selectedRes, setSelectedRes] = useState<string>("actual");
+
+	// Build resolution options: actual + standard sizes
+	const resolutionOptions = useMemo(() => {
+		if (!info) return [];
+		const options: { value: string; label: string; width: number; height: number }[] = [
+			{ value: "actual", label: `${info.width}×${info.height} (actual)`, width: info.width, height: info.height },
+		];
+		for (const size of STANDARD_RESOLUTIONS) {
+			// Skip if it matches the actual resolution exactly
+			if (size === info.width && size === info.height) continue;
+			options.push({ value: `${size}`, label: `${size}×${size}`, width: size, height: size });
+		}
+		return options;
+	}, [info]);
 
 	if (!info) {
 		return (
@@ -16,7 +36,8 @@ export default function VramBudgetPanel() {
 		);
 	}
 
-	const { width, height } = info;
+	const activeRes = resolutionOptions.find((r) => r.value === selectedRes) ?? resolutionOptions[0];
+	const { width, height } = activeRes;
 
 	const estimates = GPU_FORMATS.map((fmt) => {
 		const baseSize = fmt.sizeBytes(width, height);
@@ -24,7 +45,6 @@ export default function VramBudgetPanel() {
 		return { ...fmt, baseSize, totalSize };
 	});
 
-	// For the bar chart, find the max size
 	const maxSize = Math.max(...estimates.map((e) => e.totalSize));
 
 	return (
@@ -44,6 +64,23 @@ export default function VramBudgetPanel() {
 							<span className="text-xs text-base-content/60">Include mip chain</span>
 						</label>
 					</div>
+
+					{/* Resolution selector */}
+					<div className="mb-3">
+						<label className="text-xs text-base-content/50 mb-0.5 block">Resolution</label>
+						<select
+							value={selectedRes}
+							onChange={(e) => setSelectedRes(e.target.value)}
+							className="select select-xs select-bordered w-full"
+						>
+							{resolutionOptions.map((opt) => (
+								<option key={opt.value} value={opt.value}>
+									{opt.label}
+								</option>
+							))}
+						</select>
+					</div>
+
 					<div className="text-xs text-base-content/40 mb-3">
 						Estimated GPU memory for a {width}×{height} texture{includeMips ? " with full mip chain" : ""}.
 					</div>
