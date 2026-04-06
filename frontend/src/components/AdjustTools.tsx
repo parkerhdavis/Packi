@@ -10,6 +10,7 @@ import DropZone from "@/components/ui/DropZone";
 import CurveEditor from "@/components/ui/CurveEditor";
 import type { CurvePoint } from "@/components/ui/CurveEditor";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
+import SliderWithInput from "@/components/ui/SliderWithInput";
 import HistorySidebar from "@/components/HistorySidebar";
 import type { ExportConfig } from "@/types";
 import {
@@ -230,47 +231,32 @@ export default function AdjustTools() {
 								)}
 
 								{activeOperation === "adjust-hue" && (
-									<div>
-										<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-											Hue Offset: {operationParams["adjust-hue"].hueOffset > 0 ? "+" : ""}{operationParams["adjust-hue"].hueOffset.toFixed(0)}°
-										</label>
-										<input
-											type="range"
-											min="-180"
-											max="180"
-											step="1"
-											value={operationParams["adjust-hue"].hueOffset}
-											onChange={(e) => updateParams("adjust-hue", { hueOffset: Number.parseFloat(e.target.value) })}
-											className="range range-primary range-xs w-full"
-										/>
-										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-											<span>-180°</span>
-											<span>0°</span>
-											<span>+180°</span>
-										</div>
-									</div>
+									<SliderWithInput
+										label="Hue Offset"
+										value={operationParams["adjust-hue"].hueOffset}
+										onChange={(v) => updateParams("adjust-hue", { hueOffset: v })}
+										min={-180}
+										max={180}
+										step={1}
+										unit="°"
+										decimals={0}
+										showSign
+										rangeLabels={["-180°", "0°", "+180°"]}
+									/>
 								)}
 
 								{activeOperation === "adjust-saturation" && (
-									<div>
-										<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-											Saturation: {operationParams["adjust-saturation"].saturationOffset > 0 ? "+" : ""}{operationParams["adjust-saturation"].saturationOffset.toFixed(2)}
-										</label>
-										<input
-											type="range"
-											min="-1"
-											max="1"
-											step="0.01"
-											value={operationParams["adjust-saturation"].saturationOffset}
-											onChange={(e) => updateParams("adjust-saturation", { saturationOffset: Number.parseFloat(e.target.value) })}
-											className="range range-primary range-xs w-full"
-										/>
-										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-											<span>Desaturate</span>
-											<span>Normal</span>
-											<span>Saturate</span>
-										</div>
-									</div>
+									<SliderWithInput
+										label="Saturation"
+										value={operationParams["adjust-saturation"].saturationOffset}
+										onChange={(v) => updateParams("adjust-saturation", { saturationOffset: v })}
+										min={-1}
+										max={1}
+										step={0.01}
+										decimals={2}
+										showSign
+										rangeLabels={["Desaturate", "Normal", "Saturate"]}
+									/>
 								)}
 
 								{activeOperation === "flip" && (
@@ -288,24 +274,16 @@ export default function AdjustTools() {
 								)}
 
 								{activeOperation === "height-to-normal" && (
-									<div>
-										<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-											Strength: {operationParams["height-to-normal"].strength.toFixed(1)}
-										</label>
-										<input
-											type="range"
-											min="0.1"
-											max="10"
-											step="0.1"
-											value={operationParams["height-to-normal"].strength}
-											onChange={(e) => updateParams("height-to-normal", { strength: Number.parseFloat(e.target.value) })}
-											className="range range-primary range-xs w-full"
-										/>
-										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-											<span>0.1</span>
-											<span>10.0</span>
-										</div>
-									</div>
+									<SliderWithInput
+										label="Strength"
+										value={operationParams["height-to-normal"].strength}
+										onChange={(v) => updateParams("height-to-normal", { strength: v })}
+										min={0.1}
+										max={10}
+										step={0.1}
+										decimals={1}
+										rangeLabels={["0.1", "10.0"]}
+									/>
 								)}
 
 								{activeOperation === "blend" && (
@@ -329,24 +307,16 @@ export default function AdjustTools() {
 												compact
 											/>
 										</div>
-										<div>
-											<label className="text-xs font-semibold text-base-content/50 mb-1 block">
-												Blend Factor: {operationParams.blend.blendFactor.toFixed(2)}
-										</label>
-										<input
-											type="range"
-											min="0"
-											max="1"
-											step="0.01"
+										<SliderWithInput
+											label="Blend Factor"
 											value={operationParams.blend.blendFactor}
-											onChange={(e) => updateParams("blend", { blendFactor: Number.parseFloat(e.target.value) })}
-											className="range range-primary range-xs w-full"
+											onChange={(v) => updateParams("blend", { blendFactor: v })}
+											min={0}
+											max={1}
+											step={0.01}
+											decimals={2}
+											rangeLabels={["A only", "Full blend"]}
 										/>
-										<div className="flex justify-between text-xs text-base-content/30 mt-0.5">
-											<span>A only</span>
-											<span>Full blend</span>
-										</div>
-									</div>
 									</>
 								)}
 
