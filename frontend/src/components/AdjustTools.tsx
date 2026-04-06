@@ -4,7 +4,7 @@ import type { AdjustOperation } from "@/stores/adjustStore";
 import { useAppStore } from "@/stores/appStore";
 import { useToastStore } from "@/stores/toastStore";
 import PageHeader from "@/components/ui/PageHeader";
-import TexturePreview from "@/components/ui/TexturePreview";
+import ComparisonView from "@/components/ui/ComparisonView";
 import ExportPanel from "@/components/ui/ExportPanel";
 import DropZone from "@/components/ui/DropZone";
 import CurveEditor from "@/components/ui/CurveEditor";
@@ -351,29 +351,16 @@ export default function AdjustTools() {
 				</div>
 
 				{/* Right panel — before/after preview */}
-				<div className="flex-1 min-w-0 flex">
-					<div className="flex-1 border-r border-base-300 relative">
-						<div className="absolute top-2 left-2 z-10 text-xs text-base-content/40 bg-base-200/80 px-2 py-0.5 rounded">
-							Before
-						</div>
-						<TexturePreview
-							imageData={inputPreview}
-							imageInfo={inputInfo}
-							className="h-full"
-						/>
-					</div>
-					<div className="flex-1 relative">
-						<div className="absolute top-2 left-2 z-10 text-xs text-base-content/40 bg-base-200/80 px-2 py-0.5 rounded">
-							After
-						</div>
-						{previewLoading && (
-							<LoadingOverlay bgClass="bg-base-100/50" />
-						)}
-						<TexturePreview
-							imageData={resultPreview ?? inputPreview}
-							className="h-full"
-						/>
-					</div>
+				<div className="flex-1 min-w-0 relative">
+					{previewLoading && (
+						<LoadingOverlay bgClass="bg-base-100/50" />
+					)}
+					<ComparisonView
+						beforeImage={inputPreview}
+						afterImage={resultPreview}
+						beforeInfo={inputInfo}
+						className="h-full"
+					/>
 				</div>
 
 				{/* History sidebar (right) */}
