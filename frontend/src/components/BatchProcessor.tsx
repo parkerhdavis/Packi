@@ -3,7 +3,6 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useBatchStore } from "@/stores/batchStore";
 import { useToastStore } from "@/stores/toastStore";
 import PageHeader from "@/components/ui/PageHeader";
-import { useRef } from "react";
 import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuUpload, LuCheck, LuX, LuChevronUp, LuChevronDown, LuGripVertical } from "react-icons/lu";
 
 const stepTypes = [
@@ -43,7 +42,7 @@ export default function BatchProcessor() {
 		savePreset,
 	} = useBatchStore();
 	const addToast = useToastStore((s) => s.addToast);
-	const dragIdx = useRef<number | null>(null);
+	const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
 	const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
 	useEffect(() => {
@@ -209,33 +208,35 @@ export default function BatchProcessor() {
 									key={`step-${i}`}
 									draggable
 									onDragStart={(e) => {
-										dragIdx.current = i;
+										setDragFromIdx(i);
+										e.dataTransfer.setData("text/plain", String(i));
 										e.dataTransfer.effectAllowed = "move";
 									}}
 									onDragOver={(e) => {
 										e.preventDefault();
-										e.dataTransfer.dropEffect = "move";
+										e.stopPropagation();
 										setDragOverIdx(i);
-									}}
-									onDragLeave={() => {
-										if (dragOverIdx === i) setDragOverIdx(null);
 									}}
 									onDrop={(e) => {
 										e.preventDefault();
-										setDragOverIdx(null);
-										if (dragIdx.current !== null && dragIdx.current !== i) {
-											moveStep(dragIdx.current, i);
+										e.stopPropagation();
+										const from = Number(e.dataTransfer.getData("text/plain"));
+										if (!Number.isNaN(from) && from !== i) {
+											moveStep(from, i);
 										}
-										dragIdx.current = null;
+										setDragFromIdx(null);
+										setDragOverIdx(null);
 									}}
 									onDragEnd={() => {
-										dragIdx.current = null;
+										setDragFromIdx(null);
 										setDragOverIdx(null);
 									}}
 									className={`rounded-lg bg-base-200 border p-2 transition-colors ${
-										dragOverIdx === i
+										dragOverIdx === i && dragFromIdx !== i
 											? "border-primary bg-primary/5"
-											: "border-base-300"
+											: dragFromIdx === i
+												? "opacity-50 border-base-300"
+												: "border-base-300"
 									}`}
 								>
 									<div className="flex items-center justify-between mb-1">
