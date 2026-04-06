@@ -3,7 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useBatchStore } from "@/stores/batchStore";
 import { useToastStore } from "@/stores/toastStore";
 import PageHeader from "@/components/ui/PageHeader";
-import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuUpload, LuCheck, LuX, LuChevronUp, LuChevronDown } from "react-icons/lu";
+import { useRef } from "react";
+import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuUpload, LuCheck, LuX, LuChevronUp, LuChevronDown, LuGripVertical } from "react-icons/lu";
 
 const stepTypes = [
 	{ type: "convert" as const, label: "Convert Format" },
@@ -42,6 +43,8 @@ export default function BatchProcessor() {
 		savePreset,
 	} = useBatchStore();
 	const addToast = useToastStore((s) => s.addToast);
+	const dragIdx = useRef<number | null>(null);
+	const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
 	useEffect(() => {
 		loadPresets();
@@ -202,9 +205,44 @@ export default function BatchProcessor() {
 							</div>
 						) : (
 							pipeline.map((step, i) => (
-								<div key={`step-${i}`} className="rounded-lg bg-base-200 border border-base-300 p-2">
+								<div
+									key={`step-${i}`}
+									draggable
+									onDragStart={(e) => {
+										dragIdx.current = i;
+										e.dataTransfer.effectAllowed = "move";
+									}}
+									onDragOver={(e) => {
+										e.preventDefault();
+										e.dataTransfer.dropEffect = "move";
+										setDragOverIdx(i);
+									}}
+									onDragLeave={() => {
+										if (dragOverIdx === i) setDragOverIdx(null);
+									}}
+									onDrop={(e) => {
+										e.preventDefault();
+										setDragOverIdx(null);
+										if (dragIdx.current !== null && dragIdx.current !== i) {
+											moveStep(dragIdx.current, i);
+										}
+										dragIdx.current = null;
+									}}
+									onDragEnd={() => {
+										dragIdx.current = null;
+										setDragOverIdx(null);
+									}}
+									className={`rounded-lg bg-base-200 border p-2 transition-colors ${
+										dragOverIdx === i
+											? "border-primary bg-primary/5"
+											: "border-base-300"
+									}`}
+								>
 									<div className="flex items-center justify-between mb-1">
-										<span className="text-xs font-semibold capitalize">{step.type}</span>
+										<div className="flex items-center gap-1">
+											<LuGripVertical size={12} className="text-base-content/30 cursor-grab active:cursor-grabbing shrink-0" />
+											<span className="text-xs font-semibold capitalize">{step.type}</span>
+										</div>
 										<div className="flex items-center gap-0.5">
 											<button
 												type="button"
