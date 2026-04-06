@@ -22,11 +22,11 @@ import {
 import DirectoryTree from "@/components/ui/DirectoryTree";
 
 const modules: { id: ModuleName; label: string; tooltip: string; icon: React.ReactNode }[] = [
-	{ id: "adjust", label: "Adjust", tooltip: "Image adjustments and normal map operations", icon: <LuCompass size={20} /> },
-	{ id: "pack", label: "Pack", tooltip: "Unpack, swizzle, and pack texture channels", icon: <LuLayers size={20} /> },
-	{ id: "preview", label: "Preview", tooltip: "2D tiling and 3D material preview", icon: <LuGrid3X3 size={20} /> },
-	{ id: "size", label: "Size", tooltip: "Texture analysis and VRAM budget estimation", icon: <LuFileBox size={20} /> },
-	{ id: "batch-processor", label: "Batch", tooltip: "Bulk format conversion, resize, and rename", icon: <LuFolderCog size={20} /> },
+	{ id: "adjust", label: "Adjust", tooltip: "Image adjustments and normal map operations (Ctrl+1)", icon: <LuCompass size={20} /> },
+	{ id: "pack", label: "Pack", tooltip: "Unpack, swizzle, and pack texture channels (Ctrl+2)", icon: <LuLayers size={20} /> },
+	{ id: "preview", label: "Preview", tooltip: "2D tiling and 3D material preview (Ctrl+3)", icon: <LuGrid3X3 size={20} /> },
+	{ id: "size", label: "Size", tooltip: "Texture analysis and VRAM budget estimation (Ctrl+4)", icon: <LuFileBox size={20} /> },
+	{ id: "batch-processor", label: "Batch", tooltip: "Bulk format conversion, resize, and rename (Ctrl+5)", icon: <LuFolderCog size={20} /> },
 ];
 
 export default function Sidebar() {
@@ -179,6 +179,7 @@ export default function Sidebar() {
 				<button
 					type="button"
 					onClick={() => setActiveModule("settings")}
+					title="Settings (Ctrl+,)"
 					className={`flex items-center gap-3 px-4 py-2.5 text-left cursor-pointer transition-colors ${
 						activeModule === "settings"
 							? "text-primary bg-primary/10 border-l-2 border-primary"
