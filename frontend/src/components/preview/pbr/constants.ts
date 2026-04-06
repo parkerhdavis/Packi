@@ -58,6 +58,7 @@ export const TILING_RATIO_FACTOR: Record<GeometryType, number> = {
 	cylinder: 1 / Math.PI,
 	sphere: 0.5,
 	torus: 0.5,
+	custom: 1,
 };
 
 /** Geometry dropdown options */
@@ -67,6 +68,7 @@ export const GEOMETRY_OPTIONS: { value: GeometryType; label: string }[] = [
 	{ value: "sphere", label: "Sphere" },
 	{ value: "cylinder", label: "Cylinder" },
 	{ value: "torus", label: "Torus" },
+	{ value: "custom", label: "Custom Mesh" },
 ];
 
 /** Environment dropdown options */
