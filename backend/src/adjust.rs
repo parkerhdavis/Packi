@@ -200,3 +200,165 @@ fn hue_to_rgb(p: f32, q: f32, mut t: f32) -> f32 {
 	}
 	p
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use image::RgbaImage;
+
+	/// Create a 2×2 RGBA test image with known pixel values.
+	fn make_test_image() -> RgbaImage {
+		let mut img = RgbaImage::new(2, 2);
+		img.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));     // red
+		img.put_pixel(1, 0, image::Rgba([0, 255, 0, 255]));     // green
+		img.put_pixel(0, 1, image::Rgba([0, 0, 255, 255]));     // blue
+		img.put_pixel(1, 1, image::Rgba([128, 128, 128, 255])); // gray
+		img
+	}
+
+	// --- HSL round-trip tests ---
+
+	#[test]
+	fn hsl_roundtrip_pure_red() {
+		let (h, s, l) = rgb_to_hsl(255, 0, 0);
+		let (r, g, b) = hsl_to_rgb(h, s, l);
+		assert_eq!((r, g, b), (255, 0, 0));
+	}
+
+	#[test]
+	fn hsl_roundtrip_pure_green() {
+		let (h, s, l) = rgb_to_hsl(0, 255, 0);
+		let (r, g, b) = hsl_to_rgb(h, s, l);
+		assert_eq!((r, g, b), (0, 255, 0));
+	}
+
+	#[test]
+	fn hsl_roundtrip_pure_blue() {
+		let (h, s, l) = rgb_to_hsl(0, 0, 255);
+		let (r, g, b) = hsl_to_rgb(h, s, l);
+		assert_eq!((r, g, b), (0, 0, 255));
+	}
+
+	#[test]
+	fn hsl_roundtrip_white() {
+		let (h, s, l) = rgb_to_hsl(255, 255, 255);
+		assert!(s < 1e-4, "white should have zero saturation");
+		let (r, g, b) = hsl_to_rgb(h, s, l);
+		assert_eq!((r, g, b), (255, 255, 255));
+	}
+
+	#[test]
+	fn hsl_roundtrip_black() {
+		let (h, s, l) = rgb_to_hsl(0, 0, 0);
+		assert!(l < 1e-4, "black should have zero lightness");
+		let (r, g, b) = hsl_to_rgb(h, s, l);
+		assert_eq!((r, g, b), (0, 0, 0));
+	}
+
+	#[test]
+	fn hsl_roundtrip_midtone() {
+		let (h, s, l) = rgb_to_hsl(100, 150, 200);
+		let (r, g, b) = hsl_to_rgb(h, s, l);
+		// Allow ±1 for float rounding
+		assert!((r as i16 - 100).abs() <= 1);
+		assert!((g as i16 - 150).abs() <= 1);
+		assert!((b as i16 - 200).abs() <= 1);
+	}
+
+	// --- Luminance curve tests ---
+
+	#[test]
+	fn luminance_curve_identity() {
+		let img = make_test_image();
+		let identity_lut: Vec<u8> = (0..=255).collect();
+		let result = apply_luminance_curve_to_image(img.clone(), &identity_lut);
+		assert_eq!(result, img, "identity LUT should not change the image");
+	}
+
+	#[test]
+	fn luminance_curve_invert() {
+		let img = make_test_image();
+		let invert_lut: Vec<u8> = (0..=255).rev().collect();
+		let result = apply_luminance_curve_to_image(img, &invert_lut);
+		// Red pixel (255,0,0) → (0,255,255)
+		let p = result.get_pixel(0, 0);
+		assert_eq!(p[0], 0);
+		assert_eq!(p[1], 255);
+		assert_eq!(p[2], 255);
+		assert_eq!(p[3], 255); // alpha unchanged
+	}
+
+	#[test]
+	fn luminance_curve_preserves_alpha() {
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([100, 100, 100, 42]));
+		let identity_lut: Vec<u8> = (0..=255).collect();
+		let result = apply_luminance_curve_to_image(img, &identity_lut);
+		assert_eq!(result.get_pixel(0, 0)[3], 42);
+	}
+
+	// --- Hue adjustment tests ---
+
+	#[test]
+	fn hue_zero_offset_is_noop() {
+		let img = make_test_image();
+		let result = apply_hue_to_image(img.clone(), 0.0);
+		// Gray pixel should be unchanged (no hue to shift)
+		assert_eq!(result.get_pixel(1, 1), img.get_pixel(1, 1));
+	}
+
+	#[test]
+	fn hue_full_rotation_returns_original() {
+		let img = make_test_image();
+		let result = apply_hue_to_image(img.clone(), 360.0);
+		// Each pixel should match within ±1 due to float rounding
+		for (x, y, original) in img.enumerate_pixels() {
+			let shifted = result.get_pixel(x, y);
+			for ch in 0..3 {
+				assert!(
+					(original[ch] as i16 - shifted[ch] as i16).abs() <= 1,
+					"pixel ({},{}) channel {} differs: {} vs {}",
+					x, y, ch, original[ch], shifted[ch]
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn hue_preserves_alpha() {
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([255, 0, 0, 42]));
+		let result = apply_hue_to_image(img, 90.0);
+		assert_eq!(result.get_pixel(0, 0)[3], 42);
+	}
+
+	// --- Saturation adjustment tests ---
+
+	#[test]
+	fn saturation_zero_offset_is_noop() {
+		let img = make_test_image();
+		let result = apply_saturation_to_image(img.clone(), 0.0);
+		assert_eq!(result, img);
+	}
+
+	#[test]
+	fn saturation_negative_desaturates() {
+		// A saturated color should move toward gray when offset is negative
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([255, 0, 0, 255])); // pure red
+		let result = apply_saturation_to_image(img, -0.5);
+		let p = result.get_pixel(0, 0);
+		// Should be less saturated: R should decrease, G/B should increase
+		assert!(p[0] < 255, "R should decrease");
+		assert!(p[1] > 0, "G should increase toward gray");
+		assert!(p[2] > 0, "B should increase toward gray");
+	}
+
+	#[test]
+	fn saturation_preserves_alpha() {
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([200, 100, 50, 77]));
+		let result = apply_saturation_to_image(img, 0.5);
+		assert_eq!(result.get_pixel(0, 0)[3], 77);
+	}
+}

@@ -318,3 +318,215 @@ fn format_to_string(format: ImageFormat) -> String {
 		_ => format!("{:?}", format),
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use image::GenericImageView;
+
+	/// Create a small RGBA test image with known pixel values.
+	fn make_test_image(w: u32, h: u32) -> DynamicImage {
+		let mut img = image::RgbaImage::new(w, h);
+		for y in 0..h {
+			for x in 0..w {
+				let r = ((x * 64) % 256) as u8;
+				let g = ((y * 64) % 256) as u8;
+				let b = (((x + y) * 32) % 256) as u8;
+				img.put_pixel(x, y, image::Rgba([r, g, b, 255]));
+			}
+		}
+		DynamicImage::ImageRgba8(img)
+	}
+
+	// --- encode_to_base64_png ---
+
+	#[test]
+	fn encode_base64_produces_valid_png() {
+		let img = make_test_image(4, 4);
+		let b64 = encode_to_base64_png(&img).unwrap();
+
+		// Should be valid base64
+		use base64::Engine;
+		let bytes = base64::engine::general_purpose::STANDARD
+			.decode(&b64)
+			.unwrap();
+
+		// Should start with PNG magic bytes
+		assert_eq!(&bytes[0..4], &[0x89, 0x50, 0x4E, 0x47]);
+
+		// Should be decodable back to an image
+		let decoded = image::load_from_memory(&bytes).unwrap();
+		assert_eq!(decoded.dimensions(), (4, 4));
+	}
+
+	// --- maybe_resize ---
+
+	#[test]
+	fn maybe_resize_no_limit() {
+		let img = make_test_image(100, 100);
+		let result = maybe_resize(img, None);
+		assert_eq!(result.dimensions(), (100, 100));
+	}
+
+	#[test]
+	fn maybe_resize_within_limit() {
+		let img = make_test_image(50, 50);
+		let result = maybe_resize(img, Some(100));
+		assert_eq!(result.dimensions(), (50, 50));
+	}
+
+	#[test]
+	fn maybe_resize_exceeds_limit() {
+		let img = make_test_image(200, 100);
+		let result = maybe_resize(img, Some(50));
+		let (w, h) = result.dimensions();
+		assert!(w <= 50 && h <= 50, "should fit within 50×50, got {}×{}", w, h);
+	}
+
+	#[test]
+	fn maybe_resize_preserves_aspect_ratio() {
+		let img = make_test_image(200, 100);
+		let result = maybe_resize(img, Some(100));
+		let (w, h) = result.dimensions();
+		// 200×100 scaled to fit 100×100 → 100×50
+		assert_eq!(w, 100);
+		assert_eq!(h, 50);
+	}
+
+	// --- save_image / load_dynamic_image round-trips ---
+
+	#[test]
+	fn roundtrip_png8() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("test.png");
+		let img = make_test_image(8, 8);
+
+		save_image(&img, path.to_str().unwrap(), "png8").unwrap();
+		let loaded = load_dynamic_image(path.to_str().unwrap()).unwrap();
+
+		assert_eq!(loaded.dimensions(), (8, 8));
+		// PNG is lossless, so pixels should match exactly
+		let original_rgba = img.to_rgba8();
+		let loaded_rgba = loaded.to_rgba8();
+		assert_eq!(original_rgba, loaded_rgba);
+	}
+
+	#[test]
+	fn roundtrip_png16() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("test16.png");
+		let img = make_test_image(8, 8);
+
+		save_image(&img, path.to_str().unwrap(), "png16").unwrap();
+		let loaded = load_dynamic_image(path.to_str().unwrap()).unwrap();
+
+		assert_eq!(loaded.dimensions(), (8, 8));
+	}
+
+	#[test]
+	fn roundtrip_tga() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("test.tga");
+		let img = make_test_image(8, 8);
+
+		save_image(&img, path.to_str().unwrap(), "tga").unwrap();
+		let loaded = load_dynamic_image(path.to_str().unwrap()).unwrap();
+
+		assert_eq!(loaded.dimensions(), (8, 8));
+		// TGA is lossless for RGBA
+		let original_rgba = img.to_rgba8();
+		let loaded_rgba = loaded.to_rgba8();
+		assert_eq!(original_rgba, loaded_rgba);
+	}
+
+	#[test]
+	fn roundtrip_jpeg() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("test.jpg");
+		let img = make_test_image(8, 8);
+
+		save_image(&img, path.to_str().unwrap(), "jpeg").unwrap();
+		let loaded = load_dynamic_image(path.to_str().unwrap()).unwrap();
+
+		// JPEG is lossy, just check dimensions
+		assert_eq!(loaded.dimensions(), (8, 8));
+	}
+
+	#[test]
+	fn save_unsupported_format_errors() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("test.xyz");
+		let img = make_test_image(4, 4);
+
+		let result = save_image(&img, path.to_str().unwrap(), "xyz");
+		assert!(result.is_err());
+	}
+
+	// --- load_image_channel_sync ---
+
+	#[test]
+	fn load_channel_red() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("channels.png");
+
+		let mut img = image::RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([200, 100, 50, 128]));
+		img.save(&path).unwrap();
+
+		// Channel 0 = R, should return a grayscale with value 200
+		let b64 = load_image_channel_sync(path.to_str().unwrap(), 0).unwrap();
+		use base64::Engine;
+		let bytes = base64::engine::general_purpose::STANDARD.decode(&b64).unwrap();
+		let decoded = image::load_from_memory(&bytes).unwrap();
+		let luma = decoded.to_luma8();
+		assert_eq!(luma.get_pixel(0, 0)[0], 200);
+	}
+
+	#[test]
+	fn load_channel_luminance() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("lum.png");
+
+		let mut img = image::RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([100, 150, 200, 255]));
+		img.save(&path).unwrap();
+
+		// Channel 255 (any >3) = luminance
+		let b64 = load_image_channel_sync(path.to_str().unwrap(), 255).unwrap();
+		use base64::Engine;
+		let bytes = base64::engine::general_purpose::STANDARD.decode(&b64).unwrap();
+		let decoded = image::load_from_memory(&bytes).unwrap();
+		let luma = decoded.to_luma8();
+		let val = luma.get_pixel(0, 0)[0];
+		// 0.2126*100 + 0.7152*150 + 0.0722*200 ≈ 143.98 → 144
+		assert!((val as i16 - 144).abs() <= 1);
+	}
+
+	// --- format_to_string ---
+
+	#[test]
+	fn format_string_known_formats() {
+		assert_eq!(format_to_string(ImageFormat::Png), "PNG");
+		assert_eq!(format_to_string(ImageFormat::Jpeg), "JPEG");
+		assert_eq!(format_to_string(ImageFormat::Tga), "TGA");
+		assert_eq!(format_to_string(ImageFormat::Tiff), "TIFF");
+		assert_eq!(format_to_string(ImageFormat::Bmp), "BMP");
+	}
+
+	// --- load_image_info_sync ---
+
+	#[test]
+	fn load_image_info_returns_correct_dimensions() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("info_test.png");
+
+		let img = image::RgbaImage::new(32, 16);
+		img.save(&path).unwrap();
+
+		let info = load_image_info_sync(path.to_str().unwrap()).unwrap();
+		assert_eq!(info.width, 32);
+		assert_eq!(info.height, 16);
+		assert_eq!(info.format, "PNG");
+		assert!(info.file_size > 0);
+	}
+}

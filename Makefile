@@ -75,7 +75,7 @@ help:
 	@echo "  lint-fix           - Run Biome linter with auto-fix"
 	@echo "  format             - Format code with Biome and rustfmt"
 	@echo "  typecheck          - Run TypeScript type checking"
-	@echo "  test               - Run Rust tests"
+	@echo "  test               - Run Rust and frontend tests"
 	@echo ""
 	@echo "Versioning:"
 	@echo "  version            - Show current version"
@@ -266,6 +266,8 @@ typecheck:
 test:
 	@echo "Running Rust tests..."
 	cd backend; cargo test
+	@echo "Running frontend tests..."
+	cd frontend; $(BUN) test
 	@echo "Tests complete"
 else
 lint:
@@ -295,6 +297,8 @@ typecheck:
 test:
 	@echo "Running Rust tests..."
 	@cd backend && cargo test
+	@echo "Running frontend tests..."
+	@cd frontend && $(BUN) test
 	@echo "Tests complete"
 endif
 

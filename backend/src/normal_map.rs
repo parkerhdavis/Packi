@@ -256,3 +256,187 @@ pub async fn export_normal_result(
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	/// Create a flat normal map (all pixels pointing straight up: [128, 128, 255]).
+	fn make_flat_normal(w: u32, h: u32) -> RgbaImage {
+		let mut img = RgbaImage::new(w, h);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([128, 128, 255, 255]);
+		}
+		img
+	}
+
+	/// Create a uniform grayscale heightmap.
+	fn make_flat_heightmap(w: u32, h: u32, value: u8) -> RgbaImage {
+		let mut img = RgbaImage::new(w, h);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([value, value, value, 255]);
+		}
+		img
+	}
+
+	// --- flip_green_on_image ---
+
+	#[test]
+	fn flip_green_inverts_green_channel() {
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([100, 200, 50, 255]));
+		let result = flip_green_on_image(img);
+		let p = result.get_pixel(0, 0);
+		assert_eq!(p[0], 100, "red unchanged");
+		assert_eq!(p[1], 55, "green inverted: 255 - 200 = 55");
+		assert_eq!(p[2], 50, "blue unchanged");
+		assert_eq!(p[3], 255, "alpha unchanged");
+	}
+
+	#[test]
+	fn flip_green_double_flip_is_identity() {
+		let mut img = RgbaImage::new(2, 2);
+		img.put_pixel(0, 0, image::Rgba([10, 20, 30, 40]));
+		img.put_pixel(1, 0, image::Rgba([50, 60, 70, 80]));
+		img.put_pixel(0, 1, image::Rgba([90, 100, 110, 120]));
+		img.put_pixel(1, 1, image::Rgba([200, 210, 220, 230]));
+
+		let result = flip_green_on_image(flip_green_on_image(img.clone()));
+		assert_eq!(result, img);
+	}
+
+	#[test]
+	fn flip_green_on_flat_normal() {
+		let img = make_flat_normal(2, 2);
+		let result = flip_green_on_image(img);
+		let p = result.get_pixel(0, 0);
+		// 128 → 255 - 128 = 127
+		assert_eq!(p[1], 127);
+	}
+
+	// --- height_to_normal_on_image ---
+
+	#[test]
+	fn height_to_normal_flat_produces_up_normals() {
+		// A uniform heightmap should produce normals pointing straight up
+		let img = make_flat_heightmap(8, 8, 128);
+		let result = height_to_normal_on_image(&img, 1.0);
+
+		// Check center pixel (away from edges where Sobel clamps)
+		let p = result.get_pixel(4, 4);
+		// Straight-up normal: X≈128, Y≈128, Z≈255
+		assert!((p[0] as i16 - 128).abs() <= 1, "X should be ~128, got {}", p[0]);
+		assert!((p[1] as i16 - 128).abs() <= 1, "Y should be ~128, got {}", p[1]);
+		assert!((p[2] as i16 - 255).abs() <= 1, "Z should be ~255, got {}", p[2]);
+	}
+
+	#[test]
+	fn height_to_normal_gradient_has_nonzero_xy() {
+		// Create a horizontal gradient heightmap
+		let mut img = RgbaImage::new(8, 8);
+		for y in 0..8 {
+			for x in 0..8 {
+				let v = (x * 32) as u8;
+				img.put_pixel(x, y, image::Rgba([v, v, v, 255]));
+			}
+		}
+		let result = height_to_normal_on_image(&img, 2.0);
+
+		// Center pixel should have noticeable X displacement
+		let p = result.get_pixel(4, 4);
+		// X component should deviate from 128 due to the horizontal gradient
+		assert!(
+			(p[0] as i16 - 128).abs() > 5,
+			"X should deviate from 128 for a gradient, got {}",
+			p[0]
+		);
+	}
+
+	// --- normalize_on_image ---
+
+	#[test]
+	fn normalize_flat_normal_is_idempotent() {
+		let img = make_flat_normal(4, 4);
+		let result = normalize_on_image(img.clone());
+		for (x, y, original) in img.enumerate_pixels() {
+			let normalized = result.get_pixel(x, y);
+			for ch in 0..3 {
+				assert!(
+					(original[ch] as i16 - normalized[ch] as i16).abs() <= 1,
+					"pixel ({},{}) ch {} differs: {} vs {}",
+					x, y, ch, original[ch], normalized[ch]
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn normalize_produces_unit_length_vectors() {
+		// Create a normal map with non-unit vectors
+		let mut img = RgbaImage::new(2, 2);
+		img.put_pixel(0, 0, image::Rgba([200, 200, 200, 255])); // non-unit
+		img.put_pixel(1, 0, image::Rgba([0, 0, 200, 255]));
+		img.put_pixel(0, 1, image::Rgba([255, 128, 128, 255]));
+		img.put_pixel(1, 1, image::Rgba([128, 128, 255, 255]));
+
+		let result = normalize_on_image(img);
+
+		for pixel in result.pixels() {
+			let nx = pixel[0] as f32 / 255.0 * 2.0 - 1.0;
+			let ny = pixel[1] as f32 / 255.0 * 2.0 - 1.0;
+			let nz = pixel[2] as f32 / 255.0 * 2.0 - 1.0;
+			let len = (nx * nx + ny * ny + nz * nz).sqrt();
+			assert!(
+				(len - 1.0).abs() < 0.05,
+				"vector should be unit length, got {}",
+				len
+			);
+		}
+	}
+
+	// --- blend_normals_on_image ---
+
+	#[test]
+	fn blend_zero_factor_returns_base() {
+		let base = make_flat_normal(4, 4);
+		let mut detail = RgbaImage::new(4, 4);
+		for pixel in detail.pixels_mut() {
+			*pixel = image::Rgba([200, 100, 200, 255]); // non-flat detail
+		}
+
+		let result = blend_normals_on_image(&base, &detail, 0.0);
+
+		// With factor 0, result should be very close to the base normal
+		for pixel in result.pixels() {
+			assert!(
+				(pixel[0] as i16 - 128).abs() <= 2,
+				"X should be ~128, got {}",
+				pixel[0]
+			);
+			assert!(
+				(pixel[1] as i16 - 128).abs() <= 2,
+				"Y should be ~128, got {}",
+				pixel[1]
+			);
+		}
+	}
+
+	#[test]
+	fn blend_preserves_alpha() {
+		let base = make_flat_normal(2, 2);
+		let detail = make_flat_normal(2, 2);
+		let result = blend_normals_on_image(&base, &detail, 0.5);
+		for pixel in result.pixels() {
+			assert_eq!(pixel[3], 255);
+		}
+	}
+
+	#[test]
+	fn blend_mismatched_sizes_resizes_second() {
+		let base = make_flat_normal(4, 4);
+		let detail = make_flat_normal(8, 8); // different size
+		// Should not panic — second image resized to match first
+		let result = blend_normals_on_image(&base, &detail, 0.5);
+		assert_eq!(result.dimensions(), (4, 4));
+	}
+}
