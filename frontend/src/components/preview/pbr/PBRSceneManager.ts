@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EXRLoader } from "three/addons/loaders/EXRLoader.js";
+import { OBJLoader } from "three/addons/loaders/OBJLoader.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import type { MapKey, PBRSceneConfig } from "@/types/pbr";
 import { MAP_KEYS } from "@/types/pbr";
 import {
@@ -82,7 +84,11 @@ export class PBRSceneManager {
 			return;
 		}
 
-		if (oldConfig.geometry !== newConfig.geometry || oldConfig.geometrySubdivisions !== newConfig.geometrySubdivisions) {
+		if (
+			oldConfig.geometry !== newConfig.geometry ||
+			oldConfig.geometrySubdivisions !== newConfig.geometrySubdivisions ||
+			oldConfig.customMeshUrl !== newConfig.customMeshUrl
+		) {
 			this.updateGeometry(newConfig);
 		}
 
@@ -172,6 +178,11 @@ export class PBRSceneManager {
 		let ry = 0;
 		let rz = 0;
 
+		if (config.geometry === "custom" && config.customMeshUrl) {
+			this.loadCustomMesh(config.customMeshUrl);
+			return;
+		}
+
 		switch (config.geometry) {
 			case "cube":
 				geometry = new THREE.BoxGeometry(1, 1, 1, subs, subs, subs);
@@ -200,6 +211,60 @@ export class PBRSceneManager {
 		this.mesh.geometry = geometry;
 		this.mesh.material.side = side;
 		this.mesh.rotation.set(rx, ry, rz);
+	}
+
+	private loadCustomMesh(url: string): void {
+		const isGltf = url.includes(".glb") || url.includes(".gltf");
+
+		if (isGltf) {
+			const loader = new GLTFLoader();
+			loader.load(url, (gltf) => {
+				const meshNode = gltf.scene.getObjectByProperty("type", "Mesh") as THREE.Mesh | undefined;
+				if (meshNode?.geometry) {
+					this.applyCustomGeometry(meshNode.geometry);
+				}
+			});
+		} else {
+			// Assume OBJ
+			const loader = new OBJLoader();
+			loader.load(url, (group) => {
+				const meshNode = group.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh | undefined;
+				if (meshNode?.geometry) {
+					this.applyCustomGeometry(meshNode.geometry);
+				}
+			});
+		}
+	}
+
+	private applyCustomGeometry(geometry: THREE.BufferGeometry): void {
+		// Normalize the geometry to fit within a unit bounding box
+		geometry.computeBoundingBox();
+		const box = geometry.boundingBox!;
+		const size = box.getSize(new THREE.Vector3());
+		const maxDim = Math.max(size.x, size.y, size.z);
+		if (maxDim > 0) {
+			geometry.scale(1 / maxDim, 1 / maxDim, 1 / maxDim);
+		}
+		const center = box.getCenter(new THREE.Vector3()).multiplyScalar(1 / maxDim);
+		geometry.translate(-center.x, -center.y, -center.z);
+
+		// Ensure UVs exist (needed for texturing)
+		if (!geometry.attributes.uv) {
+			// Basic box projection fallback
+			geometry.computeBoundingBox();
+			const pos = geometry.attributes.position;
+			const uvs = new Float32Array(pos.count * 2);
+			for (let i = 0; i < pos.count; i++) {
+				uvs[i * 2] = pos.getX(i) + 0.5;
+				uvs[i * 2 + 1] = pos.getY(i) + 0.5;
+			}
+			geometry.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+		}
+
+		this.mesh.geometry.dispose();
+		this.mesh.geometry = geometry;
+		this.mesh.material.side = THREE.DoubleSide;
+		this.mesh.rotation.set(0, 0, 0);
 	}
 
 	private updateAllTextures(config: PBRSceneConfig, oldConfig?: PBRSceneConfig): void {

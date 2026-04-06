@@ -1,10 +1,12 @@
 import { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readFile } from "@tauri-apps/plugin-fs";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePreviewStore } from "@/stores/previewStore";
 import DropZone from "@/components/ui/DropZone";
 import LoadingOverlay from "@/components/ui/LoadingOverlay";
-import { LuWand } from "react-icons/lu";
+import { LuWand, LuUpload } from "react-icons/lu";
 import type { ImageInfo, ImageWithPreview } from "@/types";
 import type { GeometryType, MapKey, NormalType, PreviewPanelHandle } from "@/types/pbr";
 import { MAP_KEYS } from "@/types/pbr";
@@ -51,6 +53,8 @@ const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPre
 	const [tilingScale, setTilingScale] = useState(1.0);
 	const [clayRender, setClayRender] = useState(false);
 	const [environment, setEnvironment] = useState("field");
+	const [customMeshUrl, setCustomMeshUrl] = useState<string | undefined>(undefined);
+	const [customMeshName, setCustomMeshName] = useState<string | null>(null);
 
 	// Loading states
 	const [loadingSlots, setLoadingSlots] = useState<Set<MapKey>>(new Set());
@@ -71,7 +75,8 @@ const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPre
 		tilingScale,
 		clayRender,
 		textures: textureDataUrls,
-	}), [geometry, environment, normalType, normalScale, displacementScale, tilingScale, clayRender, textureDataUrls]);
+		customMeshUrl,
+	}), [geometry, environment, normalType, normalScale, displacementScale, tilingScale, clayRender, textureDataUrls, customMeshUrl]);
 
 	const { ready, captureViewport } = useThreeScene(canvasRef, sceneConfig);
 
@@ -246,6 +251,38 @@ const MaterialPreviewPanel = forwardRef<PreviewPanelHandle>(function MaterialPre
 								</option>
 							))}
 						</select>
+						{geometry === "custom" && (
+							<div className="flex items-center gap-1 mt-1">
+								<button
+									type="button"
+									onClick={async () => {
+										const result = await open({
+											filters: [{ name: "3D Models", extensions: ["obj", "glb", "gltf"] }],
+										});
+										if (!result) return;
+										const path = result as string;
+										const filename = path.split(/[\\/]/).pop() ?? path;
+										try {
+											const bytes = await readFile(path);
+											const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+											const mime = ext === "glb" ? "model/gltf-binary" : ext === "gltf" ? "model/gltf+json" : "text/plain";
+											const blob = new Blob([bytes], { type: mime });
+											const url = URL.createObjectURL(blob);
+											setCustomMeshUrl(url);
+											setCustomMeshName(filename);
+										} catch (err) {
+											console.error("Failed to load mesh:", err);
+										}
+									}}
+									className="btn btn-xs btn-ghost h-6 min-h-0 px-2 gap-1 flex-1"
+								>
+									<LuUpload size={12} />
+									<span className="truncate text-xs">
+										{customMeshName ?? "Load mesh..."}
+									</span>
+								</button>
+							</div>
+						)}
 					</div>
 
 					{/* Environment */}
