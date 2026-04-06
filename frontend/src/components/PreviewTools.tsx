@@ -106,6 +106,7 @@ export default function PreviewTools() {
 							onExport={handleExport}
 							disabled={exportDisabled}
 							filenameDefault={defaultFilename}
+							moduleKey="preview"
 						/>
 					</div>
 				</div>

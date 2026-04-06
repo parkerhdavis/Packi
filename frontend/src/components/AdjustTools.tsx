@@ -345,6 +345,7 @@ export default function AdjustTools() {
 							onExport={handleExport}
 							disabled={!hasResult}
 							filenameDefault="adjust_result"
+							moduleKey="adjust"
 						/>
 					</div>
 				</div>

@@ -17,6 +17,8 @@ interface ExportPanelProps {
 	onExport: (config: ExportConfig) => Promise<void>;
 	disabled?: boolean;
 	filenameDefault?: string;
+	/** Module key for per-module format memory (e.g., "adjust", "pack", "preview") */
+	moduleKey?: string;
 }
 
 export default function ExportPanel({
@@ -25,12 +27,20 @@ export default function ExportPanel({
 	onExport,
 	disabled = false,
 	filenameDefault = "output",
+	moduleKey,
 }: ExportPanelProps) {
 	const lastExportDir = useSettingsStore((s) => s.settings.last_export_dir);
 	const outputDir = useSettingsStore((s) => s.settings.output_dir);
+	const lastExportFormats = useSettingsStore((s) => s.settings.last_export_formats);
 	const saveSetting = useSettingsStore((s) => s.save);
 
-	const [format, setFormat] = useState<ExportFormat>(defaultFormat ?? formats[0]);
+	// Resolve initial format: saved per-module format > defaultFormat > first available
+	const savedFormat = moduleKey && lastExportFormats?.[moduleKey];
+	const initialFormat = (savedFormat && formats.includes(savedFormat as ExportFormat))
+		? savedFormat as ExportFormat
+		: defaultFormat ?? formats[0];
+
+	const [format, setFormat] = useState<ExportFormat>(initialFormat);
 	const [directory, setDirectory] = useState(lastExportDir ?? outputDir ?? "");
 	const [filename, setFilename] = useState(filenameDefault);
 	const [exporting, setExporting] = useState(false);
@@ -62,7 +72,18 @@ export default function ExportPanel({
 			<div className="flex gap-2">
 				<select
 					value={format}
-					onChange={(e) => setFormat(e.target.value as ExportFormat)}
+					onChange={(e) => {
+						const newFormat = e.target.value as ExportFormat;
+						setFormat(newFormat);
+						if (moduleKey) {
+							saveSetting({
+								last_export_formats: {
+									...lastExportFormats,
+									[moduleKey]: newFormat,
+								},
+							});
+						}
+					}}
 					className="select select-xs select-bordered flex-1"
 				>
 					{formats.map((f) => (
