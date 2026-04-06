@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useBatchStore } from "@/stores/batchStore";
 import { useToastStore } from "@/stores/toastStore";
 import PageHeader from "@/components/ui/PageHeader";
-import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuUpload, LuCheck, LuX } from "react-icons/lu";
+import { LuPlus, LuFolderOpen, LuTrash2, LuPlay, LuUpload, LuCheck, LuX, LuChevronUp, LuChevronDown } from "react-icons/lu";
 
 const stepTypes = [
 	{ type: "convert" as const, label: "Convert Format" },
@@ -28,6 +28,7 @@ export default function BatchProcessor() {
 		addStep,
 		removeStep,
 		updateStep,
+		moveStep,
 		setOutputDir,
 		previewPipeline,
 		runPipeline,
@@ -181,9 +182,29 @@ export default function BatchProcessor() {
 								<div key={`step-${i}`} className="rounded-lg bg-base-200 border border-base-300 p-2">
 									<div className="flex items-center justify-between mb-1">
 										<span className="text-xs font-semibold capitalize">{step.type}</span>
-										<button type="button" onClick={() => removeStep(i)} className="btn btn-ghost btn-xs h-5 min-h-0 px-0.5">
-											<LuTrash2 size={12} />
-										</button>
+										<div className="flex items-center gap-0.5">
+											<button
+												type="button"
+												onClick={() => moveStep(i, i - 1)}
+												disabled={i === 0}
+												className="btn btn-ghost btn-xs h-5 min-h-0 px-0.5 disabled:opacity-20"
+												title="Move up"
+											>
+												<LuChevronUp size={12} />
+											</button>
+											<button
+												type="button"
+												onClick={() => moveStep(i, i + 1)}
+												disabled={i === pipeline.length - 1}
+												className="btn btn-ghost btn-xs h-5 min-h-0 px-0.5 disabled:opacity-20"
+												title="Move down"
+											>
+												<LuChevronDown size={12} />
+											</button>
+											<button type="button" onClick={() => removeStep(i)} className="btn btn-ghost btn-xs h-5 min-h-0 px-0.5">
+												<LuTrash2 size={12} />
+											</button>
+										</div>
 									</div>
 									{step.type === "convert" && (
 										<select
