@@ -9,6 +9,8 @@ const stepTypes = [
 	{ type: "convert" as const, label: "Convert Format" },
 	{ type: "resize" as const, label: "Resize" },
 	{ type: "rename" as const, label: "Rename" },
+	{ type: "flip-green" as const, label: "Flip Green (DX↔GL)" },
+	{ type: "normalize" as const, label: "Normalize" },
 ];
 
 export default function BatchProcessor() {
@@ -86,7 +88,7 @@ export default function BatchProcessor() {
 		}
 	}, [runPipeline, addToast]);
 
-	const handleAddStep = useCallback((type: "convert" | "resize" | "rename") => {
+	const handleAddStep = useCallback((type: string) => {
 		switch (type) {
 			case "convert":
 				addStep({ type: "convert", format: "png8", bit_depth: 8 });
@@ -96,6 +98,12 @@ export default function BatchProcessor() {
 				break;
 			case "rename":
 				addStep({ type: "rename", pattern: "{name}" });
+				break;
+			case "flip-green":
+				addStep({ type: "flip-green" });
+				break;
+			case "normalize":
+				addStep({ type: "normalize" });
 				break;
 		}
 	}, [addStep]);

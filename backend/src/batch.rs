@@ -5,6 +5,7 @@ use std::path::Path;
 use tauri::Emitter;
 
 use crate::image_io::{load_dynamic_image, save_image};
+use crate::normal_map::{flip_green_on_image, normalize_on_image};
 use crate::settings::atomic_write;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +22,10 @@ pub enum BatchStep {
 	},
 	#[serde(rename = "rename")]
 	Rename { pattern: String },
+	#[serde(rename = "flip-green")]
+	FlipGreen,
+	#[serde(rename = "normalize")]
+	Normalize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,8 +82,10 @@ pub fn preview_batch(files: Vec<String>, pipeline: BatchPipeline) -> Result<Vec<
 				BatchStep::Convert { format, .. } => {
 					output_format = format_to_extension(format);
 				}
-				BatchStep::Resize { .. } => {
-					// Resize doesn't change the filename
+				BatchStep::Resize { .. }
+				| BatchStep::FlipGreen
+				| BatchStep::Normalize => {
+					// These don't change the filename
 				}
 				BatchStep::Rename { pattern } => {
 					output_name = apply_rename_pattern(pattern, stem, &output_format, idx);
@@ -205,6 +212,14 @@ fn process_single_file(
 			}
 			BatchStep::Rename { pattern } => {
 				output_name = apply_rename_pattern(pattern, stem, &output_ext, idx);
+			}
+			BatchStep::FlipGreen => {
+				let rgba = img.to_rgba8();
+				img = image::DynamicImage::ImageRgba8(flip_green_on_image(rgba));
+			}
+			BatchStep::Normalize => {
+				let rgba = img.to_rgba8();
+				img = image::DynamicImage::ImageRgba8(normalize_on_image(rgba));
 			}
 		}
 	}
@@ -575,5 +590,78 @@ mod tests {
 		// Verify dimensions
 		let loaded = image::open(&output_file).unwrap();
 		assert_eq!(image::GenericImageView::dimensions(&loaded), (8, 8));
+	}
+
+	#[test]
+	fn process_single_file_flip_green() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let input_path = tmp_dir.path().join("normal.png");
+		let output_dir = tmp_dir.path().join("output");
+		fs::create_dir_all(&output_dir).unwrap();
+
+		// Create a 4×4 image with known green channel value
+		let mut img = image::RgbaImage::new(4, 4);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([128, 200, 255, 255]);
+		}
+		img.save(&input_path).unwrap();
+
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::FlipGreen],
+		};
+
+		process_single_file(
+			input_path.to_str().unwrap(),
+			&pipeline,
+			output_dir.to_str().unwrap(),
+			0,
+		)
+		.unwrap();
+
+		let output_file = output_dir.join("normal.png");
+		let loaded = image::open(&output_file).unwrap().to_rgba8();
+		let p = loaded.get_pixel(0, 0);
+		assert_eq!(p[0], 128, "red unchanged");
+		assert_eq!(p[1], 55, "green flipped: 255 - 200 = 55");
+		assert_eq!(p[2], 255, "blue unchanged");
+	}
+
+	#[test]
+	fn process_single_file_normalize() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let input_path = tmp_dir.path().join("normal.png");
+		let output_dir = tmp_dir.path().join("output");
+		fs::create_dir_all(&output_dir).unwrap();
+
+		let mut img = image::RgbaImage::new(4, 4);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([128, 128, 255, 255]);
+		}
+		img.save(&input_path).unwrap();
+
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Normalize],
+		};
+
+		process_single_file(
+			input_path.to_str().unwrap(),
+			&pipeline,
+			output_dir.to_str().unwrap(),
+			0,
+		)
+		.unwrap();
+
+		let output_file = output_dir.join("normal.png");
+		assert!(output_file.exists());
+	}
+
+	#[test]
+	fn preview_batch_flip_green_preserves_filename() {
+		let files = vec!["/path/to/texture.png".to_string()];
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::FlipGreen],
+		};
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result[0].output_filename, "texture.png");
 	}
 }

@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 interface BatchStep {
-	type: "convert" | "resize" | "rename";
+	type: "convert" | "resize" | "rename" | "flip-green" | "normalize";
 	format?: string;
 	bit_depth?: number;
 	mode?: string;
