@@ -38,6 +38,7 @@ export default function Sidebar() {
 	const theme = useSettingsStore((s) => s.settings.theme);
 	const inputDir = useSettingsStore((s) => s.settings.input_dir);
 	const outputDir = useSettingsStore((s) => s.settings.output_dir);
+	const directoryViewMode = useSettingsStore((s) => s.settings.directory_view_mode);
 	const save = useSettingsStore((s) => s.save);
 
 	const splashIcon = theme === "light" ? "/packi-splash-light.png" : "/packi-splash-dark.png";
@@ -208,6 +209,8 @@ export default function Sidebar() {
 							onSetDirectory={(path) => save({ input_dir: path })}
 							onClearDirectory={() => save({ input_dir: null })}
 							activeFilePaths={activeFilePaths}
+							viewMode={(directoryViewMode === "grid" ? "grid" : "list")}
+							onViewModeChange={(mode) => save({ directory_view_mode: mode })}
 						/>
 					</div>
 					<div className="flex-1 min-h-0 border-t border-base-300 flex flex-col">

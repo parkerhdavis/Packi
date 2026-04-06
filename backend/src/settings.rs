@@ -38,6 +38,9 @@ pub struct AppSettings {
 	/// Per-module last-used export format (e.g., {"adjust": "png8", "pack": "tga"}).
 	#[serde(default)]
 	pub last_export_formats: Option<std::collections::HashMap<String, String>>,
+	/// Directory tree view mode: "list" or "grid".
+	#[serde(default)]
+	pub directory_view_mode: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

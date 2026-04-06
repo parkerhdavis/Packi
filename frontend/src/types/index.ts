@@ -10,6 +10,7 @@ export interface AppSettings {
 	output_dir: string | null;
 	default_normal_type: string | null;
 	last_export_formats: Record<string, string> | null;
+	directory_view_mode: string | null;
 }
 
 export interface DirEntry {
