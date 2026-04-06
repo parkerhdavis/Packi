@@ -26,6 +26,24 @@ fn load_image_info_sync(path: &str) -> Result<ImageInfo, String> {
 	let metadata = std::fs::metadata(file_path)
 		.map_err(|e| format!("Failed to read file metadata: {}", e))?;
 
+	// EXR files need special handling since ImageReader doesn't support them
+	if file_path
+		.extension()
+		.and_then(|e| e.to_str())
+		.is_some_and(|e| e.eq_ignore_ascii_case("exr"))
+	{
+		let img = load_exr(path)?;
+		let (width, height) = img.dimensions();
+		return Ok(ImageInfo {
+			width,
+			height,
+			channels: 4,
+			format: "EXR".to_string(),
+			bit_depth: 32,
+			file_size: metadata.len(),
+		});
+	}
+
 	let reader = ImageReader::open(file_path)
 		.map_err(|e| format!("Failed to open image: {}", e))?
 		.with_guessed_format()
@@ -158,7 +176,16 @@ fn load_image_channel_sync(path: &str, channel: u8) -> Result<String, String> {
 }
 
 /// Load a DynamicImage from a file path.
+/// Dispatches to EXR-specific loader for .exr files.
 pub fn load_dynamic_image(path: &str) -> Result<DynamicImage, String> {
+	if Path::new(path)
+		.extension()
+		.and_then(|e| e.to_str())
+		.is_some_and(|e| e.eq_ignore_ascii_case("exr"))
+	{
+		return load_exr(path);
+	}
+
 	let reader = ImageReader::open(path)
 		.map_err(|e| format!("Failed to open image: {}", e))?
 		.with_guessed_format()
@@ -167,6 +194,63 @@ pub fn load_dynamic_image(path: &str) -> Result<DynamicImage, String> {
 	reader
 		.decode()
 		.map_err(|e| format!("Failed to decode image: {}", e))
+}
+
+/// Load an OpenEXR file as a DynamicImage (RGBA 8-bit for preview compatibility).
+fn load_exr(path: &str) -> Result<DynamicImage, String> {
+	use exr::prelude::*;
+
+	let image = read_first_rgba_layer_from_file(
+		path,
+		|resolution, _| {
+			image::RgbaImage::new(resolution.width() as u32, resolution.height() as u32)
+		},
+		|img, position, (r, g, b, a): (f32, f32, f32, f32)| {
+			// Tone-map from HDR to 8-bit: simple linear clamp
+			let to_u8 = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+			img.put_pixel(
+				position.x() as u32,
+				position.y() as u32,
+				image::Rgba([to_u8(r), to_u8(g), to_u8(b), to_u8(a)]),
+			);
+		},
+	)
+	.map_err(|e| format!("Failed to read EXR: {}", e))?;
+
+	Ok(DynamicImage::ImageRgba8(image.layer_data.channel_data.pixels))
+}
+
+/// Save a DynamicImage as OpenEXR (RGBA float32).
+fn save_exr(img: &DynamicImage, path: &str) -> Result<(), String> {
+	use exr::prelude::*;
+
+	let rgba = img.to_rgba8();
+	let (w, h) = rgba.dimensions();
+
+	let channels = SpecificChannels::rgba(|position: Vec2<usize>| {
+		let pixel = rgba.get_pixel(position.x() as u32, position.y() as u32);
+		(
+			pixel[0] as f32 / 255.0,
+			pixel[1] as f32 / 255.0,
+			pixel[2] as f32 / 255.0,
+			pixel[3] as f32 / 255.0,
+		)
+	});
+
+	let layer = Layer::new(
+		(w as usize, h as usize),
+		LayerAttributes::named("rgba"),
+		Encoding::SMALL_LOSSLESS,
+		channels,
+	);
+
+	let image = Image::from_layer(layer);
+	image
+		.write()
+		.to_file(path)
+		.map_err(|e| format!("Failed to write EXR: {}", e))?;
+
+	Ok(())
 }
 
 /// Encode a DynamicImage to a base64 PNG string using fast compression.
@@ -225,6 +309,9 @@ pub fn save_image(
 			let rgb = img.to_rgb8();
 			rgb.save(output_path)
 				.map_err(|e| format!("Failed to save JPEG: {}", e))?;
+		}
+		"exr" => {
+			save_exr(img, path)?;
 		}
 		_ => return Err(format!("Unsupported export format: {}", format)),
 	}
@@ -528,5 +615,46 @@ mod tests {
 		assert_eq!(info.height, 16);
 		assert_eq!(info.format, "PNG");
 		assert!(info.file_size > 0);
+	}
+
+	// --- EXR round-trip ---
+
+	#[test]
+	fn roundtrip_exr() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("test.exr");
+		let img = make_test_image(8, 8);
+
+		save_image(&img, path.to_str().unwrap(), "exr").unwrap();
+		let loaded = load_dynamic_image(path.to_str().unwrap()).unwrap();
+
+		assert_eq!(loaded.dimensions(), (8, 8));
+		// EXR goes through f32 conversion, so values should be close but may differ by ±1
+		let original_rgba = img.to_rgba8();
+		let loaded_rgba = loaded.to_rgba8();
+		for (x, y, original) in original_rgba.enumerate_pixels() {
+			let loaded_px = loaded_rgba.get_pixel(x, y);
+			for ch in 0..4 {
+				assert!(
+					(original[ch] as i16 - loaded_px[ch] as i16).abs() <= 1,
+					"pixel ({},{}) ch {} differs: {} vs {}",
+					x, y, ch, original[ch], loaded_px[ch]
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn load_exr_info() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let path = tmp_dir.path().join("info.exr");
+		let img = make_test_image(16, 8);
+		save_image(&img, path.to_str().unwrap(), "exr").unwrap();
+
+		let info = load_image_info_sync(path.to_str().unwrap()).unwrap();
+		assert_eq!(info.width, 16);
+		assert_eq!(info.height, 8);
+		assert_eq!(info.format, "EXR");
+		assert_eq!(info.bit_depth, 32);
 	}
 }

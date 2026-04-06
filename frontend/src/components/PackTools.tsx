@@ -133,7 +133,7 @@ export default function PackTools() {
 					{/* Export bar — spans both columns */}
 					<div className="border-t border-base-300 p-3 shrink-0">
 						<ExportPanel
-							formats={["png8", "png16", "tga"]}
+							formats={["png8", "png16", "tga", "exr"]}
 							defaultFormat="png8"
 							onExport={handleExport}
 							disabled={exportDisabled}

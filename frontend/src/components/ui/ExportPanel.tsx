@@ -9,6 +9,7 @@ const formatLabels: Record<ExportFormat, string> = {
 	png16: "PNG (16-bit)",
 	tga: "TGA",
 	jpeg: "JPEG",
+	exr: "OpenEXR",
 };
 
 interface ExportPanelProps {

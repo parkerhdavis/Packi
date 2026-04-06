@@ -239,6 +239,7 @@ export default function BatchProcessor() {
 											<option value="png16">PNG (16-bit)</option>
 											<option value="tga">TGA</option>
 											<option value="jpeg">JPEG</option>
+											<option value="exr">OpenEXR</option>
 										</select>
 									)}
 									{step.type === "resize" && (
