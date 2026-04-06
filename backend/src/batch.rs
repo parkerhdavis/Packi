@@ -1,10 +1,13 @@
 use image::imageops::FilterType;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use tauri::Emitter;
 
 use crate::image_io::{load_dynamic_image, save_image};
+use crate::normal_map::{flip_green_on_image, normalize_on_image};
 use crate::settings::atomic_write;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,6 +24,10 @@ pub enum BatchStep {
 	},
 	#[serde(rename = "rename")]
 	Rename { pattern: String },
+	#[serde(rename = "flip-green")]
+	FlipGreen,
+	#[serde(rename = "normalize")]
+	Normalize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,8 +84,10 @@ pub fn preview_batch(files: Vec<String>, pipeline: BatchPipeline) -> Result<Vec<
 				BatchStep::Convert { format, .. } => {
 					output_format = format_to_extension(format);
 				}
-				BatchStep::Resize { .. } => {
-					// Resize doesn't change the filename
+				BatchStep::Resize { .. }
+				| BatchStep::FlipGreen
+				| BatchStep::Normalize => {
+					// These don't change the filename
 				}
 				BatchStep::Rename { pattern } => {
 					output_name = apply_rename_pattern(pattern, stem, &output_format, idx);
@@ -102,10 +111,12 @@ pub async fn run_batch(
 	files: Vec<String>,
 	pipeline: BatchPipeline,
 	output_dir: String,
+	continue_on_error: Option<bool>,
 	app_handle: tauri::AppHandle,
 ) -> Result<BatchResult, String> {
+	let bail_on_error = !continue_on_error.unwrap_or(true);
 	tokio::task::spawn_blocking(move || {
-		run_batch_sync(files, pipeline, output_dir, app_handle)
+		run_batch_sync(files, pipeline, output_dir, bail_on_error, app_handle)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
@@ -115,6 +126,7 @@ fn run_batch_sync(
 	files: Vec<String>,
 	pipeline: BatchPipeline,
 	output_dir: String,
+	bail_on_error: bool,
 	app_handle: tauri::AppHandle,
 ) -> Result<BatchResult, String> {
 	// Create output directory
@@ -122,23 +134,42 @@ fn run_batch_sync(
 		.map_err(|e| format!("Failed to create output directory: {}", e))?;
 
 	let total = files.len();
-	let mut processed = 0usize;
-	let mut failed = Vec::new();
+	let completed = AtomicUsize::new(0);
+	let aborted = AtomicBool::new(false);
 
-	for (idx, file_path) in files.iter().enumerate() {
-		// Emit progress
-		let _ = app_handle.emit("batch-progress", serde_json::json!({
-			"current": idx,
-			"total": total,
-			"current_file": file_path,
-		}));
-
-		match process_single_file(file_path, &pipeline, &output_dir, idx) {
-			Ok(()) => processed += 1,
-			Err(e) => failed.push(BatchFailure {
+	let results: Vec<Result<(), BatchFailure>> = files
+		.par_iter()
+		.enumerate()
+		.map(|(idx, file_path)| {
+			if bail_on_error && aborted.load(Ordering::Relaxed) {
+				return Err(BatchFailure {
+					path: file_path.clone(),
+					error: "Skipped (previous error)".to_string(),
+				});
+			}
+			let result = process_single_file(file_path, &pipeline, &output_dir, idx);
+			if result.is_err() && bail_on_error {
+				aborted.store(true, Ordering::Relaxed);
+			}
+			let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
+			let _ = app_handle.emit("batch-progress", serde_json::json!({
+				"current": done,
+				"total": total,
+				"current_file": file_path,
+			}));
+			result.map_err(|e| BatchFailure {
 				path: file_path.clone(),
 				error: e,
-			}),
+			})
+		})
+		.collect();
+
+	let mut processed = 0usize;
+	let mut failed = Vec::new();
+	for r in results {
+		match r {
+			Ok(()) => processed += 1,
+			Err(f) => failed.push(f),
 		}
 	}
 
@@ -206,6 +237,14 @@ fn process_single_file(
 			BatchStep::Rename { pattern } => {
 				output_name = apply_rename_pattern(pattern, stem, &output_ext, idx);
 			}
+			BatchStep::FlipGreen => {
+				let rgba = img.to_rgba8();
+				img = image::DynamicImage::ImageRgba8(flip_green_on_image(rgba));
+			}
+			BatchStep::Normalize => {
+				let rgba = img.to_rgba8();
+				img = image::DynamicImage::ImageRgba8(normalize_on_image(rgba));
+			}
 		}
 	}
 
@@ -242,7 +281,7 @@ fn nearest_pot(v: u32) -> u32 {
 
 /// List supported image files in a directory.
 #[tauri::command]
-pub fn list_image_files(dir: String) -> Result<Vec<String>, String> {
+pub fn list_image_files(dir: String, recursive: Option<bool>) -> Result<Vec<String>, String> {
 	let path = Path::new(&dir);
 	if !path.is_dir() {
 		return Err(format!("Not a directory: {}", dir));
@@ -251,9 +290,31 @@ pub fn list_image_files(dir: String) -> Result<Vec<String>, String> {
 	let supported = ["png", "tga", "jpg", "jpeg", "tif", "tiff", "bmp", "exr"];
 	let mut files = Vec::new();
 
-	collect_image_files(path, &supported, &mut files)?;
+	if recursive.unwrap_or(false) {
+		collect_image_files(path, &supported, &mut files)?;
+	} else {
+		collect_image_files_flat(path, &supported, &mut files)?;
+	}
 	files.sort();
 	Ok(files)
+}
+
+fn collect_image_files_flat(dir: &Path, extensions: &[&str], results: &mut Vec<String>) -> Result<(), String> {
+	let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
+	for entry in entries {
+		let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+		let path = entry.path();
+		if path.is_file() {
+			if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+				if extensions.iter().any(|e| e.eq_ignore_ascii_case(ext)) {
+					if let Some(p) = path.to_str() {
+						results.push(p.to_string());
+					}
+				}
+			}
+		}
+	}
+	Ok(())
 }
 
 fn collect_image_files(dir: &Path, extensions: &[&str], results: &mut Vec<String>) -> Result<(), String> {
@@ -575,5 +636,78 @@ mod tests {
 		// Verify dimensions
 		let loaded = image::open(&output_file).unwrap();
 		assert_eq!(image::GenericImageView::dimensions(&loaded), (8, 8));
+	}
+
+	#[test]
+	fn process_single_file_flip_green() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let input_path = tmp_dir.path().join("normal.png");
+		let output_dir = tmp_dir.path().join("output");
+		fs::create_dir_all(&output_dir).unwrap();
+
+		// Create a 4×4 image with known green channel value
+		let mut img = image::RgbaImage::new(4, 4);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([128, 200, 255, 255]);
+		}
+		img.save(&input_path).unwrap();
+
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::FlipGreen],
+		};
+
+		process_single_file(
+			input_path.to_str().unwrap(),
+			&pipeline,
+			output_dir.to_str().unwrap(),
+			0,
+		)
+		.unwrap();
+
+		let output_file = output_dir.join("normal.png");
+		let loaded = image::open(&output_file).unwrap().to_rgba8();
+		let p = loaded.get_pixel(0, 0);
+		assert_eq!(p[0], 128, "red unchanged");
+		assert_eq!(p[1], 55, "green flipped: 255 - 200 = 55");
+		assert_eq!(p[2], 255, "blue unchanged");
+	}
+
+	#[test]
+	fn process_single_file_normalize() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let input_path = tmp_dir.path().join("normal.png");
+		let output_dir = tmp_dir.path().join("output");
+		fs::create_dir_all(&output_dir).unwrap();
+
+		let mut img = image::RgbaImage::new(4, 4);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([128, 128, 255, 255]);
+		}
+		img.save(&input_path).unwrap();
+
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Normalize],
+		};
+
+		process_single_file(
+			input_path.to_str().unwrap(),
+			&pipeline,
+			output_dir.to_str().unwrap(),
+			0,
+		)
+		.unwrap();
+
+		let output_file = output_dir.join("normal.png");
+		assert!(output_file.exists());
+	}
+
+	#[test]
+	fn preview_batch_flip_green_preserves_filename() {
+		let files = vec!["/path/to/texture.png".to_string()];
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::FlipGreen],
+		};
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result[0].output_filename, "texture.png");
 	}
 }
