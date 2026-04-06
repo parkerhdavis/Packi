@@ -135,6 +135,7 @@ interface PackStoreState {
 	loadPresets: () => Promise<void>;
 	regeneratePackPreview: () => void;
 	exportPacked: (outputPath: string, format: string) => Promise<void>;
+	autoDetectChannels: (filePaths: string[]) => Promise<void>;
 }
 
 let swizzleDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -490,6 +491,25 @@ export const usePackStore = create<PackStoreState>((set, get) => ({
 			outputPath,
 			format,
 		});
+	},
+
+	autoDetectChannels: async (filePaths) => {
+		const { packPresetLabels, setChannel } = get();
+		if (!packPresetLabels) return;
+
+		const { findBestMatch } = await import("@/utils/textureDetection");
+		const usedPaths = new Set<string>();
+
+		for (const slot of ["r", "g", "b", "a"] as const) {
+			const label = packPresetLabels[slot];
+			if (!label) continue;
+			const remaining = filePaths.filter((p) => !usedPaths.has(p));
+			const match = findBestMatch(remaining, label);
+			if (match) {
+				usedPaths.add(match);
+				await setChannel(slot, match);
+			}
+		}
 	},
 }));
 

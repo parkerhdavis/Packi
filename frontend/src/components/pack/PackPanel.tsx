@@ -1,6 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { usePackStore } from "@/stores/packStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useToastStore } from "@/stores/toastStore";
 import ChannelSlotCard from "@/components/ChannelSlotCard";
+import { LuWand } from "react-icons/lu";
 
 export default function PackPanel() {
 	const {
@@ -10,7 +14,21 @@ export default function PackPanel() {
 		loadPresets,
 		applyPreset,
 		clearPreset,
+		autoDetectChannels,
 	} = usePackStore();
+	const inputDir = useSettingsStore((s) => s.settings.input_dir);
+	const addToast = useToastStore((s) => s.addToast);
+
+	const handleAutoDetect = useCallback(async () => {
+		if (!inputDir || !packPresetLabels) return;
+		try {
+			const files = await invoke<string[]>("list_image_files", { dir: inputDir });
+			await autoDetectChannels(files);
+			addToast("Auto-detected textures from input directory", "success");
+		} catch (err) {
+			addToast(`Auto-detect failed: ${err}`, "error");
+		}
+	}, [inputDir, packPresetLabels, autoDetectChannels, addToast]);
 
 	useEffect(() => {
 		loadPresets();
@@ -45,6 +63,16 @@ export default function PackPanel() {
 							</option>
 						))}
 					</select>
+					<button
+						type="button"
+						onClick={handleAutoDetect}
+						disabled={!inputDir || !packPresetLabels}
+						className="btn btn-xs btn-ghost h-6 min-h-0 px-2 gap-1"
+						title={!inputDir ? "Set an input directory first" : !packPresetLabels ? "Select a preset first" : "Auto-detect textures from input directory"}
+					>
+						<LuWand size={12} />
+						<span>Auto</span>
+					</button>
 				</div>
 
 				{/* Channel slots */}
