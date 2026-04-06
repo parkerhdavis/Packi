@@ -80,6 +80,7 @@ export default function App() {
 			else if (e.key === "3") { e.preventDefault(); setModule("preview"); }
 			else if (e.key === "4") { e.preventDefault(); setModule("size"); }
 			else if (e.key === "5") { e.preventDefault(); setModule("batch-processor"); }
+			else if (e.key === ",") { e.preventDefault(); setModule("settings"); }
 			else if (e.key === "/") { e.preventDefault(); toggleSidebar(); }
 			else if (e.key === "\\") { e.preventDefault(); useAppStore.getState().toggleHistorySidebar(); }
 		};

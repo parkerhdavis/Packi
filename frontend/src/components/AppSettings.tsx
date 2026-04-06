@@ -4,14 +4,16 @@ import AppearancePanel from "@/components/settings/AppearancePanel";
 import FilePathsPanel from "@/components/settings/FilePathsPanel";
 import PresetsConfigPanel from "@/components/settings/PresetsConfigPanel";
 import AboutPanel from "@/components/settings/AboutPanel";
-import { LuPaintbrush, LuFolderOpen, LuSettings2, LuInfo } from "react-icons/lu";
+import ShortcutsPanel from "@/components/settings/ShortcutsPanel";
+import { LuPaintbrush, LuFolderOpen, LuSettings2, LuKeyboard, LuInfo } from "react-icons/lu";
 
-type SettingsSubmodule = "appearance" | "filepaths" | "presets" | "about";
+type SettingsSubmodule = "appearance" | "filepaths" | "presets" | "shortcuts" | "about";
 
 const submodules: { id: SettingsSubmodule; label: string; description: string; icon: React.ReactNode }[] = [
 	{ id: "appearance", label: "Appearance", description: "Theme and zoom settings.", icon: <LuPaintbrush size={15} /> },
 	{ id: "filepaths", label: "File Paths", description: "Default directories for import and export.", icon: <LuFolderOpen size={15} /> },
 	{ id: "presets", label: "Presets & Config", description: "Channel packing presets and default options.", icon: <LuSettings2 size={15} /> },
+	{ id: "shortcuts", label: "Keyboard Shortcuts", description: "Reference for all keyboard shortcuts.", icon: <LuKeyboard size={15} /> },
 	{ id: "about", label: "About", description: "Version and credits.", icon: <LuInfo size={15} /> },
 ];
 
@@ -59,6 +61,7 @@ export default function AppSettings() {
 					{activeSubmodule === "appearance" && <AppearancePanel />}
 					{activeSubmodule === "filepaths" && <FilePathsPanel />}
 					{activeSubmodule === "presets" && <PresetsConfigPanel />}
+					{activeSubmodule === "shortcuts" && <ShortcutsPanel />}
 					{activeSubmodule === "about" && <AboutPanel />}
 				</div>
 			</div>
