@@ -1,7 +1,9 @@
 use image::imageops::FilterType;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tauri::Emitter;
 
 use crate::image_io::{load_dynamic_image, save_image};
@@ -129,23 +131,32 @@ fn run_batch_sync(
 		.map_err(|e| format!("Failed to create output directory: {}", e))?;
 
 	let total = files.len();
-	let mut processed = 0usize;
-	let mut failed = Vec::new();
+	let completed = AtomicUsize::new(0);
 
-	for (idx, file_path) in files.iter().enumerate() {
-		// Emit progress
-		let _ = app_handle.emit("batch-progress", serde_json::json!({
-			"current": idx,
-			"total": total,
-			"current_file": file_path,
-		}));
-
-		match process_single_file(file_path, &pipeline, &output_dir, idx) {
-			Ok(()) => processed += 1,
-			Err(e) => failed.push(BatchFailure {
+	let results: Vec<Result<(), BatchFailure>> = files
+		.par_iter()
+		.enumerate()
+		.map(|(idx, file_path)| {
+			let result = process_single_file(file_path, &pipeline, &output_dir, idx);
+			let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
+			let _ = app_handle.emit("batch-progress", serde_json::json!({
+				"current": done,
+				"total": total,
+				"current_file": file_path,
+			}));
+			result.map_err(|e| BatchFailure {
 				path: file_path.clone(),
 				error: e,
-			}),
+			})
+		})
+		.collect();
+
+	let mut processed = 0usize;
+	let mut failed = Vec::new();
+	for r in results {
+		match r {
+			Ok(()) => processed += 1,
+			Err(f) => failed.push(f),
 		}
 	}
 
