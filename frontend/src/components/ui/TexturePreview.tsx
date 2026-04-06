@@ -5,6 +5,14 @@ interface TexturePreviewProps {
 	imageData: string | null;
 	imageInfo?: ImageInfo | null;
 	className?: string;
+	/** Controlled zoom level (synced externally) */
+	controlledZoom?: number;
+	/** Controlled pan offset (synced externally) */
+	controlledPan?: { x: number; y: number };
+	/** Called when zoom/pan changes internally (for syncing) */
+	onViewChange?: (zoom: number, pan: { x: number; y: number }) => void;
+	/** Hide the toolbar (used when embedded in ComparisonView) */
+	hideToolbar?: boolean;
 }
 
 type SoloChannel = "all" | "r" | "g" | "b" | "a";
@@ -13,11 +21,23 @@ export default function TexturePreview({
 	imageData,
 	imageInfo,
 	className = "",
+	controlledZoom,
+	controlledPan,
+	onViewChange,
+	hideToolbar,
 }: TexturePreviewProps) {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const [zoom, setZoom] = useState(1);
-	const [pan, setPan] = useState({ x: 0, y: 0 });
+	const [internalZoom, setInternalZoom] = useState(1);
+	const [internalPan, setInternalPan] = useState({ x: 0, y: 0 });
+	const zoom = controlledZoom ?? internalZoom;
+	const pan = controlledPan ?? internalPan;
+
+	const updateView = useCallback((newZoom: number, newPan: { x: number; y: number }) => {
+		setInternalZoom(newZoom);
+		setInternalPan(newPan);
+		onViewChange?.(newZoom, newPan);
+	}, [onViewChange]);
 	const [isPanning, setIsPanning] = useState(false);
 	const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 	const [soloChannel, setSoloChannel] = useState<SoloChannel>("all");
@@ -41,8 +61,7 @@ export default function TexturePreview({
 				const scaleX = container.clientWidth / img.width;
 				const scaleY = container.clientHeight / img.height;
 				const fitZoom = Math.min(scaleX, scaleY);
-				setZoom(fitZoom);
-				setPan({
+				updateView(fitZoom, {
 					x: (container.clientWidth - img.width * fitZoom) / 2,
 					y: (container.clientHeight - img.height * fitZoom) / 2,
 				});
@@ -119,8 +138,7 @@ export default function TexturePreview({
 		const newPanX = mouseX - scale * (mouseX - pan.x);
 		const newPanY = mouseY - scale * (mouseY - pan.y);
 
-		setZoom(newZoom);
-		setPan({ x: newPanX, y: newPanY });
+		updateView(newZoom, { x: newPanX, y: newPanY });
 		setFitMode(false);
 	}, [zoom, pan]);
 
@@ -135,7 +153,7 @@ export default function TexturePreview({
 		if (!isPanning) return;
 		const dx = e.clientX - panStart.current.x;
 		const dy = e.clientY - panStart.current.y;
-		setPan({ x: panStart.current.panX + dx, y: panStart.current.panY + dy });
+		updateView(zoom, { x: panStart.current.panX + dx, y: panStart.current.panY + dy });
 	}, [isPanning]);
 
 	const handleMouseUp = useCallback(() => {
@@ -149,8 +167,7 @@ export default function TexturePreview({
 		const scaleX = container.clientWidth / img.width;
 		const scaleY = container.clientHeight / img.height;
 		const fitZoom = Math.min(scaleX, scaleY);
-		setZoom(fitZoom);
-		setPan({
+		updateView(fitZoom, {
 			x: (container.clientWidth - img.width * fitZoom) / 2,
 			y: (container.clientHeight - img.height * fitZoom) / 2,
 		});
@@ -158,10 +175,9 @@ export default function TexturePreview({
 	}, []);
 
 	const handleActual = useCallback(() => {
-		setZoom(1);
-		setPan({ x: 0, y: 0 });
+		updateView(1, { x: 0, y: 0 });
 		setFitMode(false);
-	}, []);
+	}, [updateView]);
 
 	const channelButtons: { id: SoloChannel; label: string; color?: string }[] = [
 		{ id: "all", label: "RGB" },
@@ -174,7 +190,7 @@ export default function TexturePreview({
 	return (
 		<div className={`flex flex-col h-full ${className}`}>
 			{/* Toolbar */}
-			<div className="flex items-center gap-1 px-2 py-1 border-b border-base-300 bg-base-200/50 shrink-0">
+			{!hideToolbar && <div className="flex items-center gap-1 px-2 py-1 border-b border-base-300 bg-base-200/50 shrink-0">
 				<div className="flex items-center gap-0.5 mr-2">
 					{channelButtons.map((ch) => (
 						<button
@@ -206,12 +222,15 @@ export default function TexturePreview({
 				>
 					1:1
 				</button>
+				<span className="text-xs text-base-content/40 ml-2 tabular-nums">
+					{(zoom * 100).toFixed(0)}%
+				</span>
 				{imageInfo && (
-					<span className="text-xs text-base-content/40 ml-2">
-						{imageInfo.width}x{imageInfo.height}
+					<span className="text-xs text-base-content/40 ml-1">
+						{imageInfo.width}×{imageInfo.height}
 					</span>
 				)}
-			</div>
+			</div>}
 
 			{/* Preview area */}
 			<div
