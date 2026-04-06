@@ -25,6 +25,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 		input_dir: null,
 		output_dir: null,
 		default_normal_type: null,
+		last_export_formats: null,
 	},
 	loaded: false,
 

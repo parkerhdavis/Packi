@@ -138,6 +138,7 @@ export default function PackTools() {
 							onExport={handleExport}
 							disabled={exportDisabled}
 							filenameDefault={defaultFilename}
+							moduleKey="pack"
 						/>
 					</div>
 				</div>

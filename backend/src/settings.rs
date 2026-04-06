@@ -35,6 +35,9 @@ pub struct AppSettings {
 	/// Default normal map type: "opengl" or "directx".
 	#[serde(default)]
 	pub default_normal_type: Option<String>,
+	/// Per-module last-used export format (e.g., {"adjust": "png8", "pack": "tga"}).
+	#[serde(default)]
+	pub last_export_formats: Option<std::collections::HashMap<String, String>>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

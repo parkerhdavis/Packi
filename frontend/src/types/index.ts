@@ -9,6 +9,7 @@ export interface AppSettings {
 	input_dir: string | null;
 	output_dir: string | null;
 	default_normal_type: string | null;
+	last_export_formats: Record<string, string> | null;
 }
 
 export interface DirEntry {
