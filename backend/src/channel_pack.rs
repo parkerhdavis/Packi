@@ -304,7 +304,7 @@ pub async fn export_swizzled(
 }
 
 /// Find the maximum resolution among all source images.
-/// Uses header-only reads to avoid fully decoding each image.
+/// Reads just the image headers to avoid full decoding.
 fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 	let mut max_w = 0u32;
 	let mut max_h = 0u32;
@@ -320,4 +320,184 @@ fn find_max_resolution(config: &PackConfig) -> Result<(u32, u32), String> {
 	}
 
 	Ok((max_w, max_h))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// --- read_source ---
+
+	#[test]
+	fn read_source_channels() {
+		let pixel = image::Rgba([10, 20, 30, 40]);
+		assert_eq!(read_source(&pixel, 0, false), 10);
+		assert_eq!(read_source(&pixel, 1, false), 20);
+		assert_eq!(read_source(&pixel, 2, false), 30);
+		assert_eq!(read_source(&pixel, 3, false), 40);
+	}
+
+	#[test]
+	fn read_source_luminance() {
+		let pixel = image::Rgba([100, 150, 200, 255]);
+		let lum = read_source(&pixel, 4, false);
+		// 0.2126*100 + 0.7152*150 + 0.0722*200 ≈ 143.98 → 144
+		assert!((lum as i16 - 144).abs() <= 1);
+	}
+
+	#[test]
+	fn read_source_invert() {
+		let pixel = image::Rgba([100, 0, 255, 128]);
+		assert_eq!(read_source(&pixel, 0, true), 155);
+		assert_eq!(read_source(&pixel, 1, true), 255);
+		assert_eq!(read_source(&pixel, 2, true), 0);
+	}
+
+	// --- do_swizzle ---
+
+	#[test]
+	fn swizzle_identity() {
+		let mut img = RgbaImage::new(2, 2);
+		img.put_pixel(0, 0, image::Rgba([10, 20, 30, 40]));
+		img.put_pixel(1, 0, image::Rgba([50, 60, 70, 80]));
+		img.put_pixel(0, 1, image::Rgba([90, 100, 110, 120]));
+		img.put_pixel(1, 1, image::Rgba([200, 210, 220, 230]));
+
+		let config = SwizzleConfig {
+			r_source: 0,
+			g_source: 1,
+			b_source: 2,
+			a_source: 3,
+			r_invert: false,
+			g_invert: false,
+			b_invert: false,
+			a_invert: false,
+		};
+
+		let dyn_img = DynamicImage::ImageRgba8(img.clone());
+		let result = do_swizzle(&dyn_img, &config);
+		assert_eq!(result, img);
+	}
+
+	#[test]
+	fn swizzle_channel_remap() {
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([10, 20, 30, 40]));
+
+		// Map: R←B, G←A, B←R, A←G
+		let config = SwizzleConfig {
+			r_source: 2,
+			g_source: 3,
+			b_source: 0,
+			a_source: 1,
+			r_invert: false,
+			g_invert: false,
+			b_invert: false,
+			a_invert: false,
+		};
+
+		let dyn_img = DynamicImage::ImageRgba8(img);
+		let result = do_swizzle(&dyn_img, &config);
+		let p = result.get_pixel(0, 0);
+		assert_eq!(*p, image::Rgba([30, 40, 10, 20]));
+	}
+
+	#[test]
+	fn swizzle_with_invert() {
+		let mut img = RgbaImage::new(1, 1);
+		img.put_pixel(0, 0, image::Rgba([100, 0, 255, 128]));
+
+		let config = SwizzleConfig {
+			r_source: 0,
+			g_source: 1,
+			b_source: 2,
+			a_source: 3,
+			r_invert: true,
+			g_invert: false,
+			b_invert: true,
+			a_invert: false,
+		};
+
+		let dyn_img = DynamicImage::ImageRgba8(img);
+		let result = do_swizzle(&dyn_img, &config);
+		let p = result.get_pixel(0, 0);
+		assert_eq!(p[0], 155); // 255 - 100
+		assert_eq!(p[1], 0);
+		assert_eq!(p[2], 0); // 255 - 255
+		assert_eq!(p[3], 128);
+	}
+
+	// --- do_pack with temp files ---
+
+	#[test]
+	fn pack_single_channel_from_file() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let img_path = tmp_dir.path().join("red.png");
+
+		// Create a 4×4 image where R=200
+		let mut img = RgbaImage::new(4, 4);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([200, 100, 50, 255]);
+		}
+		img.save(&img_path).unwrap();
+
+		let config = PackConfig {
+			r: Some(ChannelSourceConfig {
+				path: img_path.to_str().unwrap().to_string(),
+				source_channel: 0, // R channel
+				invert: false,
+			}),
+			g: None,
+			b: None,
+			a: None,
+			target_resolution: Some((4, 4)),
+		};
+
+		let result = do_pack(&config).unwrap();
+		let p = result.get_pixel(0, 0);
+		assert_eq!(p[0], 200, "R should come from source R");
+		assert_eq!(p[1], 0, "G should be 0 (no source)");
+		assert_eq!(p[2], 0, "B should be 0 (no source)");
+		assert_eq!(p[3], 255, "A defaults to 255 (no source)");
+	}
+
+	#[test]
+	fn pack_with_invert() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let img_path = tmp_dir.path().join("test.png");
+
+		let mut img = RgbaImage::new(2, 2);
+		for pixel in img.pixels_mut() {
+			*pixel = image::Rgba([100, 100, 100, 255]);
+		}
+		img.save(&img_path).unwrap();
+
+		let config = PackConfig {
+			r: Some(ChannelSourceConfig {
+				path: img_path.to_str().unwrap().to_string(),
+				source_channel: 0,
+				invert: true,
+			}),
+			g: None,
+			b: None,
+			a: None,
+			target_resolution: Some((2, 2)),
+		};
+
+		let result = do_pack(&config).unwrap();
+		let p = result.get_pixel(0, 0);
+		assert_eq!(p[0], 155, "inverted R: 255 - 100 = 155");
+	}
+
+	#[test]
+	fn pack_no_sources_errors() {
+		let config = PackConfig {
+			r: None,
+			g: None,
+			b: None,
+			a: None,
+			target_resolution: None,
+		};
+		assert!(do_pack(&config).is_err());
+	}
 }

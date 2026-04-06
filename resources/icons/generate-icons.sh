@@ -13,7 +13,7 @@ set -e  # Exit on error
 ICON_SHAPE="rounded"
 
 # Corner radius percentage for "rounded" mode (0-50, where 50 = circle)
-ROUNDED_PERCENT=18
+ROUNDED_PERCENT=12
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"

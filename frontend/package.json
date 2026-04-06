@@ -1,7 +1,7 @@
 {
 	"name": "packi",
 	"private": true,
-	"version": "0.1.5",
+	"version": "0.2.0",
 	"type": "module",
 	"scripts": {
 		"dev": "bun ./dev.ts",
@@ -10,7 +10,8 @@
 		"lint:fix": "bunx biome check --write .",
 		"tauri:dev": "cargo tauri dev",
 		"tauri:build": "cargo tauri build",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"test": "bun test"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "^2.0.0",

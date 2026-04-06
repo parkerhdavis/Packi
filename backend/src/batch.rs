@@ -327,3 +327,253 @@ fn pipelines_path() -> Result<std::path::PathBuf, String> {
 	}
 	Ok(app_dir.join("pipelines.json"))
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	// --- format_to_extension ---
+
+	#[test]
+	fn format_to_extension_png8() {
+		assert_eq!(format_to_extension("png8"), "png");
+	}
+
+	#[test]
+	fn format_to_extension_png16() {
+		assert_eq!(format_to_extension("png16"), "png");
+	}
+
+	#[test]
+	fn format_to_extension_tga() {
+		assert_eq!(format_to_extension("tga"), "tga");
+	}
+
+	#[test]
+	fn format_to_extension_jpeg() {
+		assert_eq!(format_to_extension("jpeg"), "jpg");
+	}
+
+	#[test]
+	fn format_to_extension_exr() {
+		assert_eq!(format_to_extension("exr"), "exr");
+	}
+
+	#[test]
+	fn format_to_extension_unknown_passthrough() {
+		assert_eq!(format_to_extension("bmp"), "bmp");
+	}
+
+	// --- apply_rename_pattern ---
+
+	#[test]
+	fn rename_pattern_with_name() {
+		assert_eq!(
+			apply_rename_pattern("{name}_output", "texture", "png", 0),
+			"texture_output"
+		);
+	}
+
+	#[test]
+	fn rename_pattern_with_ext() {
+		assert_eq!(
+			apply_rename_pattern("{name}.{ext}", "texture", "tga", 0),
+			"texture.tga"
+		);
+	}
+
+	#[test]
+	fn rename_pattern_with_index() {
+		assert_eq!(
+			apply_rename_pattern("file_{index}", "texture", "png", 5),
+			"file_0005"
+		);
+	}
+
+	#[test]
+	fn rename_pattern_all_placeholders() {
+		assert_eq!(
+			apply_rename_pattern("{name}_{index}.{ext}", "rock", "jpg", 42),
+			"rock_0042.jpg"
+		);
+	}
+
+	#[test]
+	fn rename_pattern_no_placeholders() {
+		assert_eq!(
+			apply_rename_pattern("constant_name", "anything", "png", 0),
+			"constant_name"
+		);
+	}
+
+	// --- nearest_pot ---
+
+	#[test]
+	fn nearest_pot_zero() {
+		assert_eq!(nearest_pot(0), 1);
+	}
+
+	#[test]
+	fn nearest_pot_exact_power() {
+		assert_eq!(nearest_pot(256), 256);
+		assert_eq!(nearest_pot(1024), 1024);
+		assert_eq!(nearest_pot(1), 1);
+	}
+
+	#[test]
+	fn nearest_pot_rounds_down() {
+		// 300 is closer to 256 than 512
+		assert_eq!(nearest_pot(300), 256);
+	}
+
+	#[test]
+	fn nearest_pot_rounds_up() {
+		// 400 is closer to 512 than 256
+		assert_eq!(nearest_pot(400), 512);
+	}
+
+	#[test]
+	fn nearest_pot_midpoint() {
+		// 384 is equidistant between 256 and 512 → rounds up
+		assert_eq!(nearest_pot(384), 512);
+	}
+
+	// --- preview_batch ---
+
+	#[test]
+	fn preview_batch_no_steps() {
+		let files = vec!["/path/to/texture.png".to_string()];
+		let pipeline = BatchPipeline { steps: vec![] };
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result.len(), 1);
+		assert_eq!(result[0].output_filename, "texture.png");
+	}
+
+	#[test]
+	fn preview_batch_convert_step() {
+		let files = vec!["/path/to/texture.png".to_string()];
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Convert {
+				format: "tga".to_string(),
+				bit_depth: 8,
+			}],
+		};
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result[0].output_filename, "texture.tga");
+		assert_eq!(result[0].output_format, "TGA");
+	}
+
+	#[test]
+	fn preview_batch_rename_step() {
+		let files = vec!["/path/to/texture.png".to_string()];
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Rename {
+				pattern: "{name}_processed".to_string(),
+			}],
+		};
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result[0].output_filename, "texture_processed.png");
+	}
+
+	#[test]
+	fn preview_batch_convert_then_rename() {
+		let files = vec!["/path/to/texture.png".to_string()];
+		let pipeline = BatchPipeline {
+			steps: vec![
+				BatchStep::Convert {
+					format: "jpeg".to_string(),
+					bit_depth: 8,
+				},
+				BatchStep::Rename {
+					pattern: "{name}_out".to_string(),
+				},
+			],
+		};
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result[0].output_filename, "texture_out.jpg");
+	}
+
+	#[test]
+	fn preview_batch_multiple_files() {
+		let files = vec![
+			"/a/one.png".to_string(),
+			"/b/two.tga".to_string(),
+		];
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Rename {
+				pattern: "batch_{index}".to_string(),
+			}],
+		};
+		let result = preview_batch(files, pipeline).unwrap();
+		assert_eq!(result[0].output_filename, "batch_0000.png");
+		assert_eq!(result[1].output_filename, "batch_0001.tga");
+	}
+
+	// --- process_single_file (integration tests with temp files) ---
+
+	#[test]
+	fn process_single_file_convert_png_to_tga() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let input_path = tmp_dir.path().join("input.png");
+		let output_dir = tmp_dir.path().join("output");
+		fs::create_dir_all(&output_dir).unwrap();
+
+		// Create a small test image
+		let img = image::RgbaImage::new(4, 4);
+		img.save(&input_path).unwrap();
+
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Convert {
+				format: "tga".to_string(),
+				bit_depth: 8,
+			}],
+		};
+
+		process_single_file(
+			input_path.to_str().unwrap(),
+			&pipeline,
+			output_dir.to_str().unwrap(),
+			0,
+		)
+		.unwrap();
+
+		let output_file = output_dir.join("input.tga");
+		assert!(output_file.exists(), "output TGA file should exist");
+	}
+
+	#[test]
+	fn process_single_file_resize() {
+		let tmp_dir = tempfile::tempdir().unwrap();
+		let input_path = tmp_dir.path().join("input.png");
+		let output_dir = tmp_dir.path().join("output");
+		fs::create_dir_all(&output_dir).unwrap();
+
+		// Create a 16×16 test image
+		let img = image::RgbaImage::new(16, 16);
+		img.save(&input_path).unwrap();
+
+		let pipeline = BatchPipeline {
+			steps: vec![BatchStep::Resize {
+				mode: "exact".to_string(),
+				width: 8,
+				height: 8,
+				filter: "lanczos".to_string(),
+			}],
+		};
+
+		process_single_file(
+			input_path.to_str().unwrap(),
+			&pipeline,
+			output_dir.to_str().unwrap(),
+			0,
+		)
+		.unwrap();
+
+		let output_file = output_dir.join("input.png");
+		assert!(output_file.exists());
+
+		// Verify dimensions
+		let loaded = image::open(&output_file).unwrap();
+		assert_eq!(image::GenericImageView::dimensions(&loaded), (8, 8));
+	}
+}
