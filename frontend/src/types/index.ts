@@ -42,7 +42,7 @@ export interface ImageWithPreview {
 
 export type ChannelSource = "r" | "g" | "b" | "a" | "luminance";
 
-export type ExportFormat = "png8" | "png16" | "tga" | "jpeg";
+export type ExportFormat = "png8" | "png16" | "tga" | "jpeg" | "exr";
 
 export interface ExportConfig {
 	format: ExportFormat;

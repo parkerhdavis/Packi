@@ -100,7 +100,8 @@ export default function AdjustTools() {
 
 	const handleExport = useCallback(async (config: ExportConfig) => {
 		try {
-			const ext = config.format === "png8" || config.format === "png16" ? ".png" : ".tga";
+			const extMap: Record<string, string> = { png8: ".png", png16: ".png", tga: ".tga", jpeg: ".jpg", exr: ".exr" };
+			const ext = extMap[config.format] ?? ".png";
 			const outputPath = `${config.directory}/${config.filename}${ext}`;
 			await exportResult(outputPath, config.format);
 			addToast(`Exported to ${config.filename}${ext}`, "success");
@@ -340,7 +341,7 @@ export default function AdjustTools() {
 					{/* Export bar — spans both columns */}
 					<div className="border-t border-base-300 p-3 shrink-0">
 						<ExportPanel
-							formats={["png8", "png16", "tga"]}
+							formats={["png8", "png16", "tga", "exr"]}
 							defaultFormat="png8"
 							onExport={handleExport}
 							disabled={!hasResult}
