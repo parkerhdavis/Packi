@@ -44,6 +44,8 @@ interface BatchState {
 	progress: BatchProgress | null;
 	result: BatchResult | null;
 	presets: NamedPipeline[];
+	recursive: boolean;
+	continueOnError: boolean;
 
 	addFiles: (paths: string[]) => void;
 	addFolder: (dir: string) => Promise<void>;
@@ -54,6 +56,8 @@ interface BatchState {
 	updateStep: (index: number, step: BatchStep) => void;
 	moveStep: (from: number, to: number) => void;
 	setOutputDir: (dir: string) => void;
+	setRecursive: (recursive: boolean) => void;
+	setContinueOnError: (continueOnError: boolean) => void;
 	previewPipeline: () => Promise<void>;
 	runPipeline: () => Promise<void>;
 	loadPresets: () => Promise<void>;
@@ -70,6 +74,8 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 	progress: null,
 	result: null,
 	presets: [],
+	recursive: false,
+	continueOnError: true,
 
 	addFiles: (paths) => {
 		set((s) => ({
@@ -80,7 +86,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 
 	addFolder: async (dir) => {
 		try {
-			const files = await invoke<string[]>("list_image_files", { dir });
+			const files = await invoke<string[]>("list_image_files", { dir, recursive: get().recursive });
 			get().addFiles(files);
 		} catch (err) {
 			console.error("Failed to list image files:", err);
@@ -123,6 +129,8 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 	},
 
 	setOutputDir: (dir) => set({ outputDir: dir }),
+	setRecursive: (recursive) => set({ recursive }),
+	setContinueOnError: (continueOnError) => set({ continueOnError }),
 
 	previewPipeline: async () => {
 		const { inputFiles, pipeline } = get();
@@ -140,7 +148,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 	},
 
 	runPipeline: async () => {
-		const { inputFiles, pipeline, outputDir } = get();
+		const { inputFiles, pipeline, outputDir, continueOnError } = get();
 		if (inputFiles.length === 0 || !outputDir) return;
 
 		set({ running: true, progress: null, result: null });
@@ -155,6 +163,7 @@ export const useBatchStore = create<BatchState>((set, get) => ({
 				files: inputFiles,
 				pipeline: { steps: pipeline },
 				outputDir,
+				continueOnError,
 			});
 			set({ result, running: false });
 		} catch (err) {

@@ -3,7 +3,7 @@ use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use tauri::Emitter;
 
 use crate::image_io::{load_dynamic_image, save_image};
@@ -111,10 +111,12 @@ pub async fn run_batch(
 	files: Vec<String>,
 	pipeline: BatchPipeline,
 	output_dir: String,
+	continue_on_error: Option<bool>,
 	app_handle: tauri::AppHandle,
 ) -> Result<BatchResult, String> {
+	let bail_on_error = !continue_on_error.unwrap_or(true);
 	tokio::task::spawn_blocking(move || {
-		run_batch_sync(files, pipeline, output_dir, app_handle)
+		run_batch_sync(files, pipeline, output_dir, bail_on_error, app_handle)
 	})
 	.await
 	.map_err(|e| format!("Task failed: {}", e))?
@@ -124,6 +126,7 @@ fn run_batch_sync(
 	files: Vec<String>,
 	pipeline: BatchPipeline,
 	output_dir: String,
+	bail_on_error: bool,
 	app_handle: tauri::AppHandle,
 ) -> Result<BatchResult, String> {
 	// Create output directory
@@ -132,12 +135,22 @@ fn run_batch_sync(
 
 	let total = files.len();
 	let completed = AtomicUsize::new(0);
+	let aborted = AtomicBool::new(false);
 
 	let results: Vec<Result<(), BatchFailure>> = files
 		.par_iter()
 		.enumerate()
 		.map(|(idx, file_path)| {
+			if bail_on_error && aborted.load(Ordering::Relaxed) {
+				return Err(BatchFailure {
+					path: file_path.clone(),
+					error: "Skipped (previous error)".to_string(),
+				});
+			}
 			let result = process_single_file(file_path, &pipeline, &output_dir, idx);
+			if result.is_err() && bail_on_error {
+				aborted.store(true, Ordering::Relaxed);
+			}
 			let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
 			let _ = app_handle.emit("batch-progress", serde_json::json!({
 				"current": done,
@@ -268,7 +281,7 @@ fn nearest_pot(v: u32) -> u32 {
 
 /// List supported image files in a directory.
 #[tauri::command]
-pub fn list_image_files(dir: String) -> Result<Vec<String>, String> {
+pub fn list_image_files(dir: String, recursive: Option<bool>) -> Result<Vec<String>, String> {
 	let path = Path::new(&dir);
 	if !path.is_dir() {
 		return Err(format!("Not a directory: {}", dir));
@@ -277,9 +290,31 @@ pub fn list_image_files(dir: String) -> Result<Vec<String>, String> {
 	let supported = ["png", "tga", "jpg", "jpeg", "tif", "tiff", "bmp", "exr"];
 	let mut files = Vec::new();
 
-	collect_image_files(path, &supported, &mut files)?;
+	if recursive.unwrap_or(false) {
+		collect_image_files(path, &supported, &mut files)?;
+	} else {
+		collect_image_files_flat(path, &supported, &mut files)?;
+	}
 	files.sort();
 	Ok(files)
+}
+
+fn collect_image_files_flat(dir: &Path, extensions: &[&str], results: &mut Vec<String>) -> Result<(), String> {
+	let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
+	for entry in entries {
+		let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
+		let path = entry.path();
+		if path.is_file() {
+			if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+				if extensions.iter().any(|e| e.eq_ignore_ascii_case(ext)) {
+					if let Some(p) = path.to_str() {
+						results.push(p.to_string());
+					}
+				}
+			}
+		}
+	}
+	Ok(())
 }
 
 fn collect_image_files(dir: &Path, extensions: &[&str], results: &mut Vec<String>) -> Result<(), String> {

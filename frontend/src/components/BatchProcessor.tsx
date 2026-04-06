@@ -32,6 +32,10 @@ export default function BatchProcessor() {
 		updateStep,
 		moveStep,
 		setOutputDir,
+		recursive,
+		setRecursive,
+		continueOnError,
+		setContinueOnError,
 		previewPipeline,
 		runPipeline,
 		loadPresets,
@@ -133,6 +137,17 @@ export default function BatchProcessor() {
 								<LuTrash2 size={14} />
 							</button>
 						)}
+					</div>
+					<div className="px-2 py-1 border-b border-base-300">
+						<label className="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								className="checkbox checkbox-xs checkbox-primary"
+								checked={recursive}
+								onChange={(e) => setRecursive(e.target.checked)}
+							/>
+							<span className="text-xs text-base-content/50">Include subfolders</span>
+						</label>
 					</div>
 					<div className="flex-1 overflow-y-auto">
 						{inputFiles.length === 0 ? (
@@ -277,7 +292,7 @@ export default function BatchProcessor() {
 								<LuFolderOpen size={14} />
 							</button>
 						</div>
-						<div className="flex gap-2">
+						<div className="flex gap-2 items-center">
 							<button
 								type="button"
 								onClick={handleRun}
@@ -288,6 +303,15 @@ export default function BatchProcessor() {
 								{running ? "Processing..." : "Run"}
 							</button>
 						</div>
+						<label className="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								className="checkbox checkbox-xs checkbox-primary"
+								checked={continueOnError}
+								onChange={(e) => setContinueOnError(e.target.checked)}
+							/>
+							<span className="text-xs text-base-content/50">Continue on error</span>
+						</label>
 					</div>
 
 					{/* Preview table */}
@@ -307,19 +331,19 @@ export default function BatchProcessor() {
 										const done = running
 											? progress != null && i < progress.current
 											: result != null;
-										const failed = result?.failed.some((f) => f.path === item.input_path);
+										const failure = result?.failed.find((f) => f.path === item.input_path);
 										const active = running && progress != null && i === progress.current;
 										return (
-											<tr key={`preview-${i}`}>
+											<tr key={`preview-${i}`} className={failure ? "bg-error/5" : ""}>
 												{(running || result) && (
 													<td className="w-6 px-1">
-														{done && !failed && <LuCheck size={12} className="text-success" />}
-														{done && failed && <LuX size={12} className="text-error" />}
+														{done && !failure && <LuCheck size={12} className="text-success" />}
+														{failure && <LuX size={12} className="text-error" title={failure.error} />}
 														{active && <span className="loading loading-spinner loading-xs" />}
 													</td>
 												)}
 												<td className="truncate max-w-32 text-xs">{item.input_path.split(/[\\/]/).pop()}</td>
-												<td className="text-xs font-mono">{item.output_filename}</td>
+												<td className="text-xs font-mono">{failure ? <span className="text-error" title={failure.error}>{failure.error}</span> : item.output_filename}</td>
 												<td className="text-xs">{item.output_format}</td>
 											</tr>
 										);
