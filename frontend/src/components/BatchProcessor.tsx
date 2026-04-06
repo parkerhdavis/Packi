@@ -43,7 +43,8 @@ export default function BatchProcessor() {
 	} = useBatchStore();
 	const addToast = useToastStore((s) => s.addToast);
 	const [dragFromIdx, setDragFromIdx] = useState<number | null>(null);
-	const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+	/** Insertion point index: 0 = before first, i = before item i, pipeline.length = after last */
+	const [dropInsertIdx, setDropInsertIdx] = useState<number | null>(null);
 
 	useEffect(() => {
 		loadPresets();
@@ -197,48 +198,73 @@ export default function BatchProcessor() {
 							</ul>
 						</div>
 					</div>
-					<div className="flex-1 overflow-y-auto p-2 space-y-2">
+					<div
+						className="flex-1 overflow-y-auto p-2 space-y-2"
+						onDragOver={(e) => {
+							e.preventDefault();
+							// Compute insertion index from cursor Y vs card positions
+							const container = e.currentTarget;
+							const cards = container.querySelectorAll<HTMLElement>("[data-step-idx]");
+							let insertAt = pipeline.length;
+							for (const card of cards) {
+								const rect = card.getBoundingClientRect();
+								const midY = rect.top + rect.height / 2;
+								const idx = Number(card.dataset.stepIdx);
+								if (e.clientY < midY) {
+									insertAt = idx;
+									break;
+								}
+							}
+							setDropInsertIdx(insertAt);
+						}}
+						onDragLeave={(e) => {
+							// Only clear if leaving the container entirely
+							if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+								setDropInsertIdx(null);
+							}
+						}}
+						onDrop={(e) => {
+							e.preventDefault();
+							const from = Number(e.dataTransfer.getData("text/plain"));
+							if (!Number.isNaN(from) && dropInsertIdx !== null) {
+								// Adjust target: if dragging down, account for the removed item
+								let to = dropInsertIdx;
+								if (from < to) to -= 1;
+								if (from !== to) {
+									moveStep(from, to);
+								}
+							}
+							setDragFromIdx(null);
+							setDropInsertIdx(null);
+						}}
+					>
 						{pipeline.length === 0 ? (
 							<div className="flex items-center justify-center h-full text-base-content/30 text-xs">
 								Add processing steps
 							</div>
 						) : (
 							pipeline.map((step, i) => (
-								<div
-									key={`step-${i}`}
-									draggable
-									onDragStart={(e) => {
-										setDragFromIdx(i);
-										e.dataTransfer.setData("text/plain", String(i));
-										e.dataTransfer.effectAllowed = "move";
-									}}
-									onDragOver={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										setDragOverIdx(i);
-									}}
-									onDrop={(e) => {
-										e.preventDefault();
-										e.stopPropagation();
-										const from = Number(e.dataTransfer.getData("text/plain"));
-										if (!Number.isNaN(from) && from !== i) {
-											moveStep(from, i);
-										}
-										setDragFromIdx(null);
-										setDragOverIdx(null);
-									}}
-									onDragEnd={() => {
-										setDragFromIdx(null);
-										setDragOverIdx(null);
-									}}
-									className={`rounded-lg bg-base-200 border p-2 transition-colors ${
-										dragOverIdx === i && dragFromIdx !== i
-											? "border-primary bg-primary/5"
-											: dragFromIdx === i
-												? "opacity-50 border-base-300"
-												: "border-base-300"
-									}`}
-								>
+								<div key={`step-${i}`}>
+									{/* Insertion line before this item */}
+									{dropInsertIdx === i && dragFromIdx !== null && dragFromIdx !== i && (
+										<div className="h-0.5 bg-primary rounded-full -mt-1 mb-1" />
+									)}
+									<div
+										data-step-idx={i}
+										draggable
+										onDragStart={(e) => {
+											setDragFromIdx(i);
+											e.dataTransfer.setData("text/plain", String(i));
+											e.dataTransfer.effectAllowed = "move";
+										}}
+										onDragEnd={() => {
+											setDragFromIdx(null);
+											setDropInsertIdx(null);
+										}}
+										className={`rounded-lg bg-base-200 border border-base-300 p-2 ${
+											dragFromIdx === i ? "opacity-40" : ""
+										}`}
+									>
 									<div className="flex items-center justify-between mb-1">
 										<div className="flex items-center gap-1">
 											<LuGripVertical size={12} className="text-base-content/30 cursor-grab active:cursor-grabbing shrink-0" />
@@ -310,6 +336,11 @@ export default function BatchProcessor() {
 											<p className="text-xs text-base-content/30 mt-0.5">{"{name}"} {"{index}"} {"{ext}"}</p>
 										</div>
 									)}
+								</div>
+								{/* Insertion line after last item */}
+								{i === pipeline.length - 1 && dropInsertIdx === pipeline.length && dragFromIdx !== null && (
+									<div className="h-0.5 bg-primary rounded-full mt-1" />
+								)}
 								</div>
 							))
 						)}
