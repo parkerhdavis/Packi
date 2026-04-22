@@ -33,7 +33,10 @@ async function buildCSS() {
 }
 
 async function buildMain() {
-	const pkg = await Bun.file("package.json").json();
+	// package.json lives at the app root (apps/desktop/), one level up
+	// from this script. Resolve via import.meta.url so it works no matter
+	// where the dev command was invoked from.
+	const pkg = await Bun.file(new URL("../package.json", import.meta.url)).json();
 	await Bun.build({
 		entrypoints: ["src/main.tsx"],
 		outdir: DIST,

@@ -1,11 +1,11 @@
 {
-	"name": "packi",
+	"name": "desktop",
 	"private": true,
 	"version": "0.2.0",
 	"type": "module",
 	"scripts": {
-		"dev": "bun ./dev.ts",
-		"build": "tsc --noEmit && bun ./build.ts",
+		"dev": "cd frontend && bun ./dev.ts",
+		"build": "tsc --noEmit && cd frontend && bun ./build.ts",
 		"lint": "bunx biome check .",
 		"lint:fix": "bunx biome check --write .",
 		"tauri:dev": "cargo tauri dev",
