@@ -1,0 +1,16 @@
+{
+	"name": "packi",
+	"private": true,
+	"version": "0.2.0",
+	"workspaces": ["apps/*"],
+	"scripts": {
+		"typecheck": "tsc --noEmit -p apps/desktop",
+		"lint": "bunx biome check .",
+		"lint:fix": "bunx biome check --write ."
+	},
+	"devDependencies": {
+		"@tauri-apps/cli": "^2.0.0",
+		"@types/bun": "latest",
+		"typescript": "^5.7.0"
+	}
+}

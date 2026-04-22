@@ -6,7 +6,7 @@
 	"build": {
 		"beforeDevCommand": {
 			"script": "bun run dev",
-			"cwd": "../frontend"
+			"cwd": ".."
 		},
 		"devUrl": "http://localhost:5173",
 		"frontendDist": "../frontend/dist"
@@ -61,12 +61,12 @@
 		"active": true,
 		"targets": "all",
 		"icon": [
-			"../resources/icons/32x32.png",
-			"../resources/icons/128x128.png",
-			"../resources/icons/128x128@2x.png",
-			"../resources/icons/512x512.png",
-			"../resources/icons/icon.icns",
-			"../resources/icons/icon.ico"
+			"../../../resources/icons/32x32.png",
+			"../../../resources/icons/128x128.png",
+			"../../../resources/icons/128x128@2x.png",
+			"../../../resources/icons/512x512.png",
+			"../../../resources/icons/icon.icns",
+			"../../../resources/icons/icon.ico"
 		]
 	}
 }

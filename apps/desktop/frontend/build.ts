@@ -45,7 +45,9 @@ if (cssProc.exitCode !== 0) {
 // Main application bundle
 // ---------------------------------------------------------------------------
 console.log("  -> Building main app...");
-const pkg = await Bun.file("package.json").json();
+// Resolve relative to this script so the read works regardless of cwd.
+// package.json lives at the app root (apps/desktop/), one level up.
+const pkg = await Bun.file(new URL("../package.json", import.meta.url)).json();
 const mainResult = await Bun.build({
 	entrypoints: ["src/main.tsx"],
 	outdir: DIST,

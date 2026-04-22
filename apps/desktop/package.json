@@ -1,11 +1,11 @@
 {
-	"name": "packi",
+	"name": "desktop",
 	"private": true,
 	"version": "0.2.0",
 	"type": "module",
 	"scripts": {
-		"dev": "bun ./dev.ts",
-		"build": "tsc --noEmit && bun ./build.ts",
+		"dev": "cd frontend && bun ./dev.ts",
+		"build": "tsc --noEmit && cd frontend && bun ./build.ts",
 		"lint": "bunx biome check .",
 		"lint:fix": "bunx biome check --write .",
 		"tauri:dev": "cargo tauri dev",
@@ -27,7 +27,6 @@
 	},
 	"devDependencies": {
 		"@tailwindcss/cli": "^4.1.0",
-		"@tauri-apps/cli": "^2.0.0",
 		"@types/bun": "latest",
 		"@types/react": "^19.1.0",
 		"@types/react-dom": "^19.1.0",
