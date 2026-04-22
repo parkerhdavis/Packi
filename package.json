@@ -9,6 +9,7 @@
 		"lint:fix": "bunx biome check --write ."
 	},
 	"devDependencies": {
+		"@tauri-apps/cli": "^2.0.0",
 		"@types/bun": "latest",
 		"typescript": "^5.7.0"
 	}
