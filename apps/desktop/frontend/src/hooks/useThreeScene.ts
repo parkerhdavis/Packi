@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useRef, useState, useCallback } from "react";
 import type { PBRSceneConfig, PBRSceneStatus } from "@/types/pbr";
 import { PBRSceneManager } from "@/components/preview/pbr/PBRSceneManager";

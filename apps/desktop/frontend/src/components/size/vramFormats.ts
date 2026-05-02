@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /** GPU texture compression format definition */
 export interface GpuFormat {
 	name: string;

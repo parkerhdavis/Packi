@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use image::{DynamicImage, RgbaImage};
 
 use crate::image_io::{encode_to_base64_png, load_dynamic_image, maybe_resize, save_image};

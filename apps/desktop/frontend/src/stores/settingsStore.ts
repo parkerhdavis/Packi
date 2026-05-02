@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { AppSettings } from "@/types";

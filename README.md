@@ -146,7 +146,7 @@ make build
 
 ## License
 
-Covered under the GPL License, see [LICENSE](./LICENSE.md)
+Covered under the GNU Affero General Public License v3.0 (AGPL-3.0), see [LICENSE](./LICENSE.md)
 
 Beyond that, I only have one rule: **First, do no harm. Then, help where you can.**
 

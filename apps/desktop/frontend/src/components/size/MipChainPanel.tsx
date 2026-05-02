@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useMemo, useEffect, useState, useRef } from "react";
 import { useSizeStore } from "@/stores/sizeStore";
 import { computeMipLevels, GPU_FORMATS, formatBytes } from "@/components/size/vramFormats";

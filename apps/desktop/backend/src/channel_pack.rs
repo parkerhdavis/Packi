@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 use image::{DynamicImage, GenericImageView, RgbaImage};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};

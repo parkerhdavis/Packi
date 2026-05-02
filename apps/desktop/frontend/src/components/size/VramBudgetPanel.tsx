@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useState, useMemo, useEffect } from "react";
 import { useSizeStore } from "@/stores/sizeStore";
 import TexturePreview from "@/components/ui/TexturePreview";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useToastStore } from "@/stores/toastStore";
 import { LuX } from "react-icons/lu";
 

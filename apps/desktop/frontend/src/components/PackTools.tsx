@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useCallback } from "react";
 import { usePackStore } from "@/stores/packStore";
 import type { PackSubmodule } from "@/stores/packStore";

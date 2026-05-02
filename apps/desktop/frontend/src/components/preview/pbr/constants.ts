@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import * as THREE from "three";
 import type { GeometryType, MapKey, NormalType } from "@/types/pbr";
 

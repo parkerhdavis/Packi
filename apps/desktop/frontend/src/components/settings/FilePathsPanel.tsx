@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useSettingsStore } from "@/stores/settingsStore";
