@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useUndoStore } from "@/stores/undoStore";
 import { useAppStore } from "@/stores/appStore";
 import { LuPanelRightClose, LuUndo2, LuRedo2 } from "react-icons/lu";

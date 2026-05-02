@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { usePackStore } from "@/stores/packStore";
 import type { ChannelSource } from "@/types";
 import DropZone from "@/components/ui/DropZone";

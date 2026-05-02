@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useSizeStore } from "@/stores/sizeStore";
 import type { SizeSubmodule } from "@/stores/sizeStore";
 import { useAppStore } from "@/stores/appStore";

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useCallback, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useBatchStore } from "@/stores/batchStore";

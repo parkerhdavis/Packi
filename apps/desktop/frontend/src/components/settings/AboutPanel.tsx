@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useSettingsStore } from "@/stores/settingsStore";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import useAlpacaGame from "@/hooks/useAlpacaGame";

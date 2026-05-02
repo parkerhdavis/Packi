@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useState, useCallback } from "react";
 import TexturePreview from "@/components/ui/TexturePreview";
 import type { ImageInfo } from "@/types";

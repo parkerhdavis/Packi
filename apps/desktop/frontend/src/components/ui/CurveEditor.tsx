@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useRef, useCallback } from "react";
 
 // canvasSpliner is a UMD module — import the class from the default export

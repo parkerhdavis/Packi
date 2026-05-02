@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 interface SliderWithInputProps {
 	label: string;
 	value: number;

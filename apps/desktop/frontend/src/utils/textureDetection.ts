@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 /**
  * Keyword database for matching texture role names to filename patterns.
  * Each entry maps a canonical role name to a list of filename keywords.

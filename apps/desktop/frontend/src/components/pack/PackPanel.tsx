@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { usePackStore } from "@/stores/packStore";

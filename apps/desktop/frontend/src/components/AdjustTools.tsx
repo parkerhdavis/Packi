@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
 import { useCallback } from "react";
 import { useAdjustStore } from "@/stores/adjustStore";
 import type { AdjustOperation } from "@/stores/adjustStore";
