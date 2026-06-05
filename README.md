@@ -6,6 +6,10 @@ A free, open-source, offline desktop application that bundles common game-artist
 Packi isn't a replacement for any DCC; rather, it's a helpful sidecar for texture tasks that don't need all that extra weight: packing channels, normal map ops, batch-converting formats, adjusting curves, previewing materials, estimating VRAM budgets, etc. These are operations artists often solve with ad-hoc Photoshop actions, single-purpose web tools, or CLI utilities they'd rather not have to deal with.
 
 
+> [!NOTE]
+> This project is being archived in its current state, as all of its image adjustment and texture packing functionality (and much more) has been fully incorporated into my multimedia DAM project, [Garnet](https://github.com/parkerhdavis/Garnet). The image functionality is handled by Garnet's base modules, and the more esoteric texture-packing functionality can be included with a 3D Texturing plugin.
+
+
 ## Stack
 
 - **Runtime / Package Manager:** Bun
